@@ -163,8 +163,9 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	 * @throws RuntimeException When no `response.completed` event is present.
 	 */
 	protected function parseStreamingResponseToGenerativeAiResult( Response $response ): GenerativeAiResult {
-		$body          = (string) $response->getBody();
-		$final_response = null;
+		$body                  = (string) $response->getBody();
+		$final_response        = null;
+		$accumulated_outputs   = array();
 
 		// SSE events are separated by blank lines. Each event is one or more
 		// "field: value" lines; we only care about "event:" and "data:".
@@ -186,12 +187,28 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 					$data_lines[] = ltrim( substr( $line, 5 ), ' ' );
 				}
 			}
-			if ( 'response.completed' !== $event_name || array() === $data_lines ) {
+			if ( array() === $data_lines ) {
 				continue;
 			}
 			$decoded = json_decode( implode( "\n", $data_lines ), true );
-			if ( is_array( $decoded ) && isset( $decoded['response'] ) && is_array( $decoded['response'] ) ) {
+			if ( ! is_array( $decoded ) ) {
+				continue;
+			}
+
+			if ( 'response.completed' === $event_name
+				&& isset( $decoded['response'] ) && is_array( $decoded['response'] )
+			) {
 				$final_response = $decoded['response'];
+				continue;
+			}
+
+			// Accumulate per-item events as a fallback. The Codex backend's
+			// `response.completed` payload sometimes ships an empty `output`,
+			// with the actual content delivered only via these item events.
+			if ( 'response.output_item.done' === $event_name
+				&& isset( $decoded['item'] ) && is_array( $decoded['item'] )
+			) {
+				$accumulated_outputs[] = $decoded['item'];
 			}
 		}
 
@@ -200,6 +217,16 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 				'ChatGPT stream did not contain a response.completed event. Body head: '
 				. esc_html( substr( $body, 0, 400 ) )
 			);
+		}
+
+		// Backfill output from per-item events when the completed payload
+		// didn't include it (Codex backend behavior changed in a recent
+		// update — output is streamed per-item and not duplicated).
+		if (
+			( ! isset( $final_response['output'] ) || ! is_array( $final_response['output'] ) || array() === $final_response['output'] )
+			&& array() !== $accumulated_outputs
+		) {
+			$final_response['output'] = $accumulated_outputs;
 		}
 
 		// Re-wrap the extracted payload as a normal Response so the existing
@@ -499,7 +526,11 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 		$response_data = $response->getData();
 
 		if ( ! isset( $response_data['output'] ) || ! $response_data['output'] ) {
-			throw ResponseException::fromMissingData( esc_html( $this->providerMetadata()->getName() ), 'output' );
+			$keys = is_array( $response_data ) ? implode( ', ', array_keys( $response_data ) ) : '(non-array)';
+			throw ResponseException::fromMissingData(
+				esc_html( $this->providerMetadata()->getName() ),
+				esc_html( 'output (top-level keys present: ' . $keys . ')' )
+			);
 		}
 		if ( ! is_array( $response_data['output'] ) || ! array_is_list( $response_data['output'] ) ) {
 			throw ResponseException::fromInvalidData(
