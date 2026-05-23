@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<ruleset name="AI Provider for ChatGPT — plugin identity">
+	<description>Plugin identity rules: text_domain (i18n) and global prefix whitelist.</description>
+
+	<rule ref="./.phpcs.common.xml"/>
+
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="ai-provider-for-chatgpt"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="ai_provider_chatgpt"/>
+				<element value="Halawa\ChatGptAiProvider"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

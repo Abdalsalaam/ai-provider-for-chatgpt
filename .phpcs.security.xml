@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<ruleset name="Security sniffs from WordPress Coding Standards">
+	<description>Security sniffs from WordPress Coding Standards. Imports .phpcs.common.xml for the shared file/exclude/arg/config set.</description>
+
+	<rule ref="./.phpcs.common.xml"/>
+
+	<!-- Errors always fail; warnings (e.g. DirectDatabaseQuery) should be
+	     addressed inline with phpcs:ignore + rationale at their callsite. -->
+	<config name="ignore_warnings_on_exit" value="1"/>
+
+	<rule ref="WordPress.Security.EscapeOutput"/>
+	<rule ref="WordPress.Security.ValidatedSanitizedInput.InputNotSanitized"/>
+	<rule ref="WordPress.Security.SafeRedirect"/>
+	<rule ref="WordPress.Security.NonceVerification"/>
+	<rule ref="WordPress.Security.PluginMenuSlug"/>
+
+	<!-- Covers rule: The eval() construct is very dangerous, and is impossible to secure. ... these must not be used. -->
+	<rule ref="Squiz.PHP.Eval.Discouraged">
+		<type>error</type>
+		<message>eval() is a security risk so not allowed.</message>
+	</rule>
+</ruleset>

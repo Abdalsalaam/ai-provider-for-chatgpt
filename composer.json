@@ -1,0 +1,112 @@
+{
+    "name": "abdalsalaam/ai-provider-for-chatgpt",
+    "description": "AI Provider for ChatGPT for the PHP AI Client SDK.",
+    "license": "GPL-2.0-or-later",
+    "version": "0.1.0",
+    "keywords": [
+        "ai",
+        "chatgpt",
+        "openai",
+        "wordpress",
+        "llm"
+    ],
+    "authors": [
+        {
+            "name": "Abdalsalaam Halawa",
+            "homepage": "https://halawa.io"
+        }
+    ],
+    "homepage": "https://github.com/Abdalsalaam/ai-provider-for-chatgpt",
+    "support": {
+        "issues": "https://github.com/Abdalsalaam/ai-provider-for-chatgpt/issues",
+        "source": "https://github.com/Abdalsalaam/ai-provider-for-chatgpt"
+    },
+    "require": {
+        "php": ">=7.4",
+        "ext-openssl": "*",
+        "ext-sodium": "*"
+    },
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpstan/phpstan": "~2.1",
+        "slevomat/coding-standard": "^8.20",
+        "squizlabs/php_codesniffer": "^3.7",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "woocommerce/woocommerce-sniffs": "*",
+        "wp-coding-standards/wpcs": "*",
+        "wordpress/php-ai-client": "^0.4 || dev-trunk"
+    },
+    "suggest": {
+        "wordpress/php-ai-client": "Required. The core PHP AI Client SDK that this provider extends."
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Halawa\\ChatGptAiProvider\\": "src/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "php-http/discovery": true
+        },
+        "optimize-autoloader": true,
+        "platform": {
+            "php": "7.4"
+        },
+        "sort-packages": true
+    },
+    "archive": {
+        "exclude": [
+            "!assets",
+            "!build",
+            "node_modules",
+            "client",
+            "tsconfig.json",
+            "webpack.config.js",
+            "bin",
+            "tests",
+            "docs",
+            ".phpstan",
+            ".phpcs.*.xml",
+            ".phpcs.xml",
+            "README.md",
+            "package.json",
+            "package-lock.json",
+            "composer.lock",
+            "phpunit.xml.dist",
+            "ai-provider-for-chatgpt.zip",
+            ".*",
+            "pnpm-lock.yaml",
+            ".wordpress.org"
+        ]
+    },
+    "scripts": {
+        "check-security": [
+            "./vendor/bin/phpcs --standard=./.phpcs.security.xml --report-full --report-summary -s"
+        ],
+        "check-l18n": [
+            "./vendor/bin/phpcs --standard=./.phpcs.l18n.xml --report-full --report-summary -s"
+        ],
+        "check-php": [
+            "./vendor/bin/phpcs --standard=./.phpcs.php.xml --report-full --report-summary -s"
+        ],
+        "check-php:fix": [
+            "./vendor/bin/phpcbf --standard=./.phpcs.php.xml --report-full --report-summary"
+        ],
+        "check-all": [
+            "./vendor/bin/phpcs --standard=./.phpcs.xml --report-full --report-summary -s"
+        ],
+        "check-all:fix": [
+            "./vendor/bin/phpcbf --standard=./.phpcs.xml --report-full --report-summary"
+        ],
+        "phpstan": [
+            "./vendor/bin/phpstan analyse --configuration=.phpstan/local-config.neon --level=2"
+        ],
+        "build": [
+            "composer install --no-dev --optimize-autoloader",
+            "composer archive --format=zip --file=ai-provider-for-chatgpt"
+        ]
+    }
+}

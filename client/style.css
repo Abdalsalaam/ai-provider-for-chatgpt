@@ -1,0 +1,75 @@
+/* AI Provider for ChatGPT — admin UI overrides. */
+
+/*
+ * Strip the 20px left padding WP admin puts on #wpcontent so the <Page>
+ * header bleeds edge-to-edge like `options-general.php?page=ai-wp-admin`.
+ * Scoped to this settings page via the body class WP adds for the slug.
+ */
+body.settings_page_ai-provider-for-chatgpt #wpcontent {
+	padding-left: 0;
+}
+
+/*
+ * <Page> from @wordpress/admin-ui uses `display: flex; height: 100%` and a
+ * sticky header, so the mount root has to give it real height and bleed past
+ * #wpbody-content's default bottom padding to look right.
+ */
+.ai-provider-for-chatgpt-root {
+	min-height: calc( 100vh - var( --wp-admin--admin-bar--height, 32px ) );
+	margin-bottom: -65px; /* compensate for #wpbody-content padding-bottom */
+}
+
+/*
+ * Constrain the inner stack to a 680px column, matching the layout used by
+ * `options-general.php?page=ai-wp-admin` (see routes/ai-home/style.scss in
+ * WordPress/ai). The <Page> primitive itself paints the full-width header.
+ */
+.ai-provider-for-chatgpt-stack {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 680px;
+	margin: 0 auto;
+	padding: 24px;
+}
+
+@media ( max-width: 480px ) {
+	.ai-provider-for-chatgpt-stack {
+		padding: 8px;
+	}
+}
+
+.ai-provider-for-chatgpt-table th {
+	width: 220px;
+	padding-left: 0;
+}
+
+.ai-provider-for-chatgpt-actions-row {
+	display: flex;
+	gap: 0.5em;
+	align-items: center;
+	margin-top: 1em;
+}
+
+.ai-provider-for-chatgpt-details {
+	margin-top: 0.5em;
+}
+
+.ai-provider-for-chatgpt-pairing {
+	margin-top: 1em;
+}
+
+.ai-provider-for-chatgpt-pairing-cmd {
+	background: #1d2327;
+	color: #f0f0f1;
+	padding: 12px 14px;
+	border-radius: 4px;
+	overflow-x: auto;
+	font-size: 13px;
+	user-select: all;
+}
+
+.ai-provider-for-chatgpt-advanced {
+	margin-top: 1.5em;
+	padding-top: 1em;
+	border-top: 1px solid #dcdcde;
+}

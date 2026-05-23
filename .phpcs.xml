@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<ruleset name="AI Provider for ChatGPT">
+	<description>AI Provider for ChatGPT dev PHP_CodeSniffer ruleset. Aggregator: imports the three concern-specific rulesets so `composer run check-all` runs them together.</description>
+
+	<rule ref="./.phpcs.php.xml"/>
+	<rule ref="./.phpcs.l18n.xml"/>
+	<rule ref="./.phpcs.security.xml"/>
+</ruleset>

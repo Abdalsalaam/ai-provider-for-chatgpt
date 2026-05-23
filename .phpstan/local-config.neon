@@ -1,0 +1,6 @@
+# local PHPStan configuration for AI Provider for ChatGPT
+includes:
+    - ./dist/phpstan.neon
+parameters:
+    bootstrapFiles:
+        - phpstan-bootstrap.php

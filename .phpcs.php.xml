@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<ruleset name="AI Provider for ChatGPT — PHP">
+	<description>AI Provider for ChatGPT generic PHP coding standards.</description>
+
+	<rule ref="./.phpcs.common.xml"/>
+
+	<!-- Rules -->
+	<rule ref="WooCommerce-Core"/>
+	<rule ref="WordPress-Core"/>
+	<rule ref="WordPress-Extra"/>
+	<rule ref="WordPress-Docs"/>
+
+	<rule ref="PHPCompatibility"/>
+
+	<!--
+		PSR-4 autoloaded class files use PascalCase filenames and class doc blocks,
+		not the traditional WordPress file-naming or separate file-doc conventions.
+	-->
+	<rule ref="WordPress.Files.FileName">
+		<exclude-pattern>src/</exclude-pattern>
+	</rule>
+
+	<!--
+		Methods overriding the PHP AI Client SDK abstract classes must keep their
+		camelCase names (baseUrl, createModel, createRequest, etc.) because the
+		interface signatures are dictated by the upstream SDK.
+	-->
+	<rule ref="WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid">
+		<exclude-pattern>src/</exclude-pattern>
+	</rule>
+
+	<!-- Alignment warnings are stylistic and not enforced by wordpress.org review. -->
+	<rule ref="Generic.Formatting.MultipleStatementAlignment.NotSameWarning">
+		<severity>0</severity>
+	</rule>
+</ruleset>

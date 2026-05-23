@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<ruleset name="AI Provider for ChatGPT — common">
+	<description>Shared file/exclude/arg/config for all ChatGPT PHPCS rulesets. Imported by .phpcs.security.xml, .phpcs.l18n.xml, and .phpcs.php.xml so settings stay in one place.</description>
+
+	<file>src</file>
+	<file>ai-provider-for-chatgpt.php</file>
+
+	<!-- Exclude paths. The first pattern excludes any folder whose name starts with a dot
+	     (.git/, .github/, .phpstan/, .wp-env/, …) so dotfile dirs don't need to be listed. -->
+	<exclude-pattern>/\.[^/]+/</exclude-pattern>
+	<exclude-pattern>vendor/</exclude-pattern>
+	<exclude-pattern>assets/</exclude-pattern>
+	<exclude-pattern>node_modules/</exclude-pattern>
+	<exclude-pattern>dist/</exclude-pattern>
+
+	<!-- Show progress + source codes; colors; PHP only. -->
+	<arg value="ps"/>
+	<arg name="colors"/>
+	<arg name="extensions" value="php"/>
+
+	<!-- Strip the filepaths in reports down to the relevant bit. -->
+	<arg name="basepath" value="./"/>
+
+	<!-- Check up to 8 files simultaneously. -->
+	<arg name="parallel" value="8"/>
+
+	<!-- Configs -->
+	<config name="testVersion" value="7.4-"/>
+	<config name="minimum_supported_wp_version" value="6.9"/>
+
+	<!-- Do not fail CI over warnings -->
+	<config name="ignore_warnings_on_exit" value="1"/>
+</ruleset>

@@ -1,0 +1,26 @@
+# Exclude repository and CI files from composer archive / git archive.
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/.github/ export-ignore
+
+# Exclude build and quality tooling from archive.
+/.phpstan/ export-ignore
+/.phpcs.common.xml export-ignore
+/.phpcs.xml export-ignore
+/.phpcs.php.xml export-ignore
+/.phpcs.l18n.xml export-ignore
+/.phpcs.security.xml export-ignore
+/tests/ export-ignore
+/bin/ export-ignore
+/docs/ export-ignore
+
+# Exclude lock files and dev configs.
+/composer.lock export-ignore
+/package.json export-ignore
+/package-lock.json export-ignore
+/pnpm-lock.yaml export-ignore
+/phpunit.xml.dist export-ignore
+
+# Exclude distribution artifacts.
+/ai-provider-for-chatgpt.zip export-ignore
+/README.md export-ignore

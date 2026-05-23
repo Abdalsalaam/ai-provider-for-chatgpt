@@ -1,0 +1,32 @@
+{
+  "name": "ai-provider-for-chatgpt",
+  "private": true,
+  "version": "0.1.0",
+  "description": "React admin UI for the AI Provider for ChatGPT plugin.",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
+    "lint:js": "wp-scripts lint-js client",
+    "format": "wp-scripts format client",
+    "typecheck": "tsc --noEmit",
+    "package": "rm -f ai-provider-for-chatgpt.zip && npm run build && composer install --no-dev --optimize-autoloader && composer archive --format=zip --file=ai-provider-for-chatgpt && composer install"
+  },
+  "dependencies": {
+    "@wordpress/admin-ui": "^2.1.0",
+    "@wordpress/ui": "^0.13.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@wordpress/api-fetch": "^7.46.0",
+    "@wordpress/components": "^32.6.0",
+    "@wordpress/data": "^10.46.0",
+    "@wordpress/dependency-extraction-webpack-plugin": "^6.27.0",
+    "@wordpress/element": "^6.46.0",
+    "@wordpress/i18n": "^6.17.0",
+    "@wordpress/icons": "^12.2.0",
+    "@wordpress/notices": "^5.46.0",
+    "@wordpress/scripts": "^30.7.0",
+    "typescript": "^5.5.4"
+  }
+}
