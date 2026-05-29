@@ -133,10 +133,17 @@ class ConnectionController extends WP_REST_Controller {
 			)
 		);
 
-		// Public — security comes from the one-time pairing token in the body,
-		// not from a logged-in admin cookie. The CLI cannot present one. The
-		// permission_callback enforces a per-IP rate limit so the public route
-		// cannot be abused as a DoS or token-brute-force surface.
+		/*
+		 * Intentionally public endpoint (permission_callback => __return_true).
+		 *
+		 * The companion CLI that posts here holds no WordPress login cookie and
+		 * cannot pass current_user_can(). The security boundary is instead the
+		 * one-time, single-use 256-bit pairing token in the request body: it is
+		 * format-validated by the `token` validate_callback (64 hex chars) and
+		 * consumed atomically in redeem_pairing() before any credential is
+		 * stored. As a secondary, non-authorization safeguard, redeem_pairing()
+		 * also applies a per-IP rate limit to blunt DoS / brute-force attempts.
+		 */
 		register_rest_route(
 			$this->namespace,
 			'/' . $this->rest_base . '/pair',
@@ -144,7 +151,7 @@ class ConnectionController extends WP_REST_Controller {
 				array(
 					'methods'             => WP_REST_Server::CREATABLE,
 					'callback'            => array( $this, 'redeem_pairing' ),
-					'permission_callback' => array( $this, 'pair_rate_limit' ),
+					'permission_callback' => '__return_true',
 					'args'                => array(
 						'token'  => array(
 							'type'              => 'string',
@@ -195,17 +202,20 @@ class ConnectionController extends WP_REST_Controller {
 	/**
 	 * Per-IP rate limiter for the public pairing-redeem endpoint.
 	 *
-	 * A simple sliding-window counter backed by a transient. The 256-bit token
-	 * is brute-force-safe on its own, so this throttle exists to blunt DoS and
-	 * any future weakening of the token (e.g. an accidentally-shortened token
-	 * format). The cap is intentionally generous so the legitimate CLI retry
-	 * path is never affected.
+	 * This is a secondary DoS / brute-force safeguard, NOT the authorization
+	 * gate — the security boundary is the single-use token validated and
+	 * consumed in redeem_pairing(). It is invoked from that callback (the route
+	 * itself is intentionally public) rather than wired as a permission_callback,
+	 * because a rate limiter does not express authorization intent.
+	 *
+	 * A simple sliding-window counter backed by a transient. The cap is
+	 * intentionally generous so the legitimate CLI retry path is never affected.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @return bool|WP_Error True when the request may proceed, WP_Error otherwise.
 	 */
-	public function pair_rate_limit() {
+	private function pair_rate_limit() {
 		$ip = $this->client_ip();
 		if ( '' === $ip ) {
 			return true;
@@ -217,11 +227,11 @@ class ConnectionController extends WP_REST_Controller {
 		 *
 		 * @param int $max_attempts Maximum redemption attempts per minute. Default 10.
 		 */
-		$max_attempts = (int) apply_filters( 'ai_provider_chatgpt_pair_rate_limit', 10 );
+		$max_attempts = (int) apply_filters( 'halawa_chatgpt_pair_rate_limit', 10 );
 		if ( $max_attempts <= 0 ) {
 			return true;
 		}
-		$key     = 'ai_provider_for_chatgpt_pair_rl_' . hash( 'sha256', $ip );
+		$key     = 'halawa_chatgpt_pair_rl_' . hash( 'sha256', $ip );
 		$current = (int) get_transient( $key );
 		if ( $current >= $max_attempts ) {
 			return new WP_Error(
@@ -355,6 +365,8 @@ class ConnectionController extends WP_REST_Controller {
 	 * POST /connection/pair — redeems a pairing token by storing the OAuth bundle.
 	 *
 	 * Public route; the security boundary is the unguessable single-use token.
+	 * A per-IP rate limit is applied first as a secondary DoS / brute-force
+	 * safeguard before the token is consumed.
 	 *
 	 * @since 0.1.0
 	 *
@@ -362,6 +374,11 @@ class ConnectionController extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function redeem_pairing( WP_REST_Request $request ) {
+		$rate_limit = $this->pair_rate_limit();
+		if ( is_wp_error( $rate_limit ) ) {
+			return $rate_limit;
+		}
+
 		$token  = (string) $request->get_param( 'token' );
 		$bundle = (string) $request->get_param( 'bundle' );
 
@@ -398,7 +415,7 @@ class ConnectionController extends WP_REST_Controller {
 		 *
 		 * @since 0.1.0
 		 */
-		do_action( 'ai_provider_chatgpt_paired' );
+		do_action( 'halawa_chatgpt_paired' );
 
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Diagnostic under WP_DEBUG only.

@@ -32,8 +32,8 @@ use Exception;
  */
 final class PairingTokenStore {
 
-	private const TRANSIENT_PREFIX = 'ai_provider_for_chatgpt_pair_';
-	private const ACTIVE_OPTION    = 'ai_provider_for_chatgpt_pair_active';
+	private const TRANSIENT_PREFIX = 'halawa_chatgpt_pair_';
+	private const ACTIVE_OPTION    = 'halawa_chatgpt_pair_active';
 	private const TTL_SECONDS      = 600;
 
 	/**

@@ -96,10 +96,10 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 		// is accepted. session-id / thread-id / x-codex-installation-id are
 		// required by /responses (codex-rs/codex-api/src/requests/headers.rs).
 		if ( null === self::$installation_id_cache ) {
-			$installation_id = get_option( 'ai_provider_for_chatgpt_installation_id', '' );
+			$installation_id = get_option( 'halawa_chatgpt_installation_id', '' );
 			if ( ! is_string( $installation_id ) || '' === $installation_id ) {
 				$installation_id = wp_generate_uuid4();
-				update_option( 'ai_provider_for_chatgpt_installation_id', $installation_id, false );
+				update_option( 'halawa_chatgpt_installation_id', $installation_id, false );
 			}
 			self::$installation_id_cache = $installation_id;
 		}
@@ -109,10 +109,10 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 		// it stable per installation; session-id rotates per request, which
 		// matches Codex CLI behavior for one-shot completions.
 		if ( null === self::$thread_id_cache ) {
-			$thread_id = get_option( 'ai_provider_for_chatgpt_thread_id', '' );
+			$thread_id = get_option( 'halawa_chatgpt_thread_id', '' );
 			if ( ! is_string( $thread_id ) || '' === $thread_id ) {
 				$thread_id = wp_generate_uuid4();
-				update_option( 'ai_provider_for_chatgpt_thread_id', $thread_id, false );
+				update_option( 'halawa_chatgpt_thread_id', $thread_id, false );
 			}
 			self::$thread_id_cache = $thread_id;
 		}

@@ -4,6 +4,7 @@
 
 	<file>src</file>
 	<file>ai-provider-for-chatgpt.php</file>
+	<file>uninstall.php</file>
 
 	<!-- Exclude paths. The first pattern excludes any folder whose name starts with a dot
 	     (.git/, .github/, .phpstan/, .wp-env/, …) so dotfile dirs don't need to be listed. -->

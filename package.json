@@ -1,7 +1,7 @@
 {
   "name": "ai-provider-for-chatgpt",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React admin UI for the AI Provider for ChatGPT plugin.",
   "license": "GPL-2.0-or-later",
   "scripts": {

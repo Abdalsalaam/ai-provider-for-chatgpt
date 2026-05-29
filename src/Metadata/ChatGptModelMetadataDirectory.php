@@ -49,7 +49,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 * `gpt-5.2` for Plus), so without this fallback the WP AI picker would
 	 * never see the rest.
 	 *
-	 * Filterable via `ai_provider_chatgpt_bundled_models`.
+	 * Filterable via `halawa_chatgpt_bundled_models`.
 	 *
 	 * @since 0.1.0
 	 *
@@ -158,7 +158,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 		 *
 		 * @param array<int, array{id: string, model_family_display_name?: string}> $bundled The default bundled entries.
 		 */
-		$bundled        = apply_filters( 'ai_provider_chatgpt_bundled_models', self::BUNDLED_MODELS );
+		$bundled        = apply_filters( 'halawa_chatgpt_bundled_models', self::BUNDLED_MODELS );
 		$seen_ids       = array();
 		foreach ( $models_data as $entry ) {
 			if ( ! is_array( $entry ) ) {

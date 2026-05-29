@@ -3,7 +3,7 @@ Contributors: abdalsalaam
 Tags: ai, chatgpt, openai, ai-provider, chatbot
 Requires at least: 6.9
 Tested up to: 7.0
-Stable tag: 0.1.1
+Stable tag: 0.1.2
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -68,17 +68,17 @@ Tokens are stored in the WordPress options table on your own site, encrypted at 
 
 == External services ==
 
-This plugin connects to OpenAI APIs, an external service provided by OpenAI, L.L.C. It is required so the WordPress AI Client can route requests to ChatGPT models from your site.
+This plugin relies on OpenAI's online APIs, an external service operated by OpenAI, L.L.C. The connection is required so the WordPress AI Client can authenticate with your ChatGPT account and route requests to ChatGPT models from your site. The plugin contacts two OpenAI-operated domains: `auth.openai.com` (token refresh) and `chatgpt.com` (model list and text generation). No data is sent to OpenAI until you connect an account and one of the actions below occurs.
 
 The plugin contacts the following endpoints:
 
-* **`POST https://auth.openai.com/oauth/token`** — called when the stored access token is about to expire, to obtain a fresh one. The request transmits the OAuth `client_id`, the encrypted refresh token stored in your WordPress options table, and the `refresh_token` grant type. No prompt or user content is sent.
-* **`GET https://chatgpt.com/backend-api/models`** — called from the **Settings → ChatGPT** screen and when the AI Client refreshes its model list. No user content is sent; only the access token is transmitted in the `Authorization` header so OpenAI can return the list of models available to the connected account.
-* **`POST https://chatgpt.com/backend-api/codex/responses`** — called whenever any plugin or theme on your site uses the WordPress AI Client to generate text with a ChatGPT model. The request includes the access token, the `ChatGPT-Account-ID` of the connected account, and the prompt/messages, system instructions, tool definitions, and any other parameters supplied by the calling code (for example, conversation history, JSON schema for structured output, or files attached to the prompt). No data is sent to OpenAI until such a request is made.
+* **`POST https://auth.openai.com/oauth/token`** — called when the stored access token is about to expire, to obtain a fresh one. The request transmits the OAuth `client_id`, the refresh token (decrypted only in transit from your WordPress options table), and the `refresh_token` grant type. No prompt or user content is sent.
+* **`GET https://chatgpt.com/backend-api/codex/models`** — called from the **Settings → ChatGPT** screen (including the optional diagnostics "remote models" probe) and when the AI Client refreshes its model list. The access token (`Authorization` header), the `ChatGPT-Account-ID` header, and a `client_version` query parameter are sent so OpenAI can return the list of models available to the connected account. No prompt or user content is sent.
+* **`POST https://chatgpt.com/backend-api/codex/responses`** — called whenever any plugin or theme on your site uses the WordPress AI Client to generate text with a ChatGPT model. The request includes the access token, the `ChatGPT-Account-ID` of the connected account, and the prompt/messages, system instructions, tool definitions, and any other parameters supplied by the calling code (for example, conversation history, JSON schema for structured output, or files attached to the prompt).
 
-Your OAuth tokens are stored encrypted in your site's WordPress options table and are only transmitted to OpenAI to authenticate the requests above.
+Your OAuth tokens are stored encrypted in your site's WordPress options table and are only transmitted to OpenAI to authenticate the requests above. The plugin does not send your data to any other third-party service.
 
-This service is provided by OpenAI:
+These services are provided by OpenAI. By connecting an account and using this provider you agree to OpenAI's terms:
 
 * Terms of Use: [https://openai.com/policies/terms-of-use/](https://openai.com/policies/terms-of-use/)
 * Privacy Policy: [https://openai.com/policies/privacy-policy/](https://openai.com/policies/privacy-policy/)
@@ -89,7 +89,18 @@ This service is provided by OpenAI:
 
 == Changelog ==
 
-= 1.0.0 =
+= 0.1.2 =
+
+* Prefixed all plugin-owned options, transients, and hooks with `halawa_chatgpt_` to avoid collisions in WordPress's shared namespaces.
+* Documented every external service the plugin contacts and corrected the model-list endpoint URL in the readme.
+* Made the public CLI-pairing REST route's intentionally-public design explicit (`__return_true`) while keeping its single-use-token security boundary and per-IP rate limiting.
+* Added uninstall cleanup that removes the plugin's stored options and transients.
+
+= 0.1.1 =
+
+* Fixed a "Missing the output key" error from the Codex `/responses` stream.
+
+= 0.1.0 =
 
 * Initial release.
 * ChatGPT text generation models with dynamic model discovery.
@@ -99,5 +110,5 @@ This service is provided by OpenAI:
 
 == Upgrade Notice ==
 
-= 1.0.0 =
-First public release.
+= 0.1.2 =
+Unique `halawa_chatgpt_` prefixes, fuller external-service documentation, a clearer public pairing endpoint, and uninstall cleanup.

@@ -15,7 +15,7 @@
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
 		<properties>
 			<property name="prefixes" type="array">
-				<element value="ai_provider_chatgpt"/>
+				<element value="halawa_chatgpt"/>
 				<element value="Halawa\ChatGptAiProvider"/>
 			</property>
 		</properties>

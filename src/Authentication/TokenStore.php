@@ -47,13 +47,17 @@ use WordPress\AiClient\Common\Exception\RuntimeException;
  */
 class TokenStore {
 
-	public const OPTION_NAME = 'ai_provider_for_chatgpt_tokens';
+	public const OPTION_NAME = 'halawa_chatgpt_tokens';
 
 	/**
-	 * WP core reads `connectors_ai_{sanitized_id}_api_key` for each AI
-	 * connector and marks the provider "configured" only when the option is
-	 * a non-empty string. Our provider id is `chatgpt`, which sanitizes
-	 * (dashes → underscores) to `chatgpt`.
+	 * Option name dictated by the official WordPress "AI" plugin
+	 * (https://github.com/WordPress/ai), NOT by this plugin. That plugin reads
+	 * `connectors_ai_{provider_id}_api_key` for each registered AI connector and
+	 * surfaces the provider as "configured" in its Settings → Connectors UI when
+	 * the option holds a non-empty string. The convention is fixed there — see
+	 * its `connectors_ai_openai_api_key` / `connectors_ai_google_api_key` /
+	 * `connectors_ai_anthropic_api_key` map — so this constant must match it
+	 * verbatim and cannot carry our own prefix. Our provider id is `chatgpt`.
 	 */
 	public const CORE_API_KEY_OPTION = 'connectors_ai_chatgpt_api_key';
 
@@ -208,7 +212,7 @@ class TokenStore {
 			|| strlen( $auth ) < 32 || strlen( $logged_in ) < 32
 		) {
 			throw new RuntimeException(
-				'ai-provider-for-chatgpt: AUTH_KEY and LOGGED_IN_KEY must be defined with strong unique values in wp-config.php to encrypt OAuth tokens. See https://api.wordpress.org/secret-key/1.1/salt/'
+				'ai-provider-for-chatgpt: AUTH_KEY and LOGGED_IN_KEY must be defined with strong, unique values in wp-config.php to encrypt OAuth tokens. Regenerate the "Authentication Unique Keys and Salts" block in your wp-config.php and try again.'
 			);
 		}
 		$material = $auth . '|' . $logged_in . '|ai-provider-for-chatgpt';

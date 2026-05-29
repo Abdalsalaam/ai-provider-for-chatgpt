@@ -5,7 +5,7 @@
  * Description: Registers OpenAI as a WordPress AI provider authenticated with a ChatGPT account (Free/Plus/Pro) instead of an API key. Usage is billed against the connected ChatGPT subscription.
  * Requires at least: 6.9
  * Requires PHP: 7.4
- * Version: 0.1.1
+ * Version: 0.1.2
  * Author: Abdalsalaam Halawa
  * Author URI: https://halawa.io
  * License: GPL-2.0-or-later
@@ -55,7 +55,7 @@ const DEFAULT_OAUTH_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
  * query string on `/models` and as the User-Agent prefix on `/responses`).
  * Bumping it surfaces newer models (e.g. gpt-5.5) that older client versions
  * are not entitled to. Override via the
- * `ai_provider_chatgpt_codex_client_version` filter.
+ * `halawa_chatgpt_codex_client_version` filter.
  *
  * @since 0.1.0
  */
@@ -80,7 +80,7 @@ function codex_client_version(): string {
 	 *
 	 * @param string $version Default client version (e.g. "0.65.0").
 	 */
-	$value = apply_filters( 'ai_provider_chatgpt_codex_client_version', DEFAULT_CODEX_CLIENT_VERSION );
+	$value = apply_filters( 'halawa_chatgpt_codex_client_version', DEFAULT_CODEX_CLIENT_VERSION );
 	return is_string( $value ) && '' !== $value ? $value : DEFAULT_CODEX_CLIENT_VERSION;
 }
 
