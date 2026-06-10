@@ -15,7 +15,6 @@ export type ConnectionStatus = {
 	id_token_expired: boolean;
 	last_refresh: number | null;
 	oauth_client_id: string;
-	has_core_api_key_flag: boolean;
 	provider: {
 		registered: boolean;
 		configured: boolean;
@@ -24,7 +23,6 @@ export type ConnectionStatus = {
 };
 
 export type Diagnostics = {
-	core_api_key_option: boolean;
 	registry: {
 		has: boolean;
 		configured: boolean;

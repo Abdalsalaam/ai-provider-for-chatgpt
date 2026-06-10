@@ -24,21 +24,6 @@ export function Diagnostics() {
 						<tr>
 							<th scope="row">
 								{ __(
-									'WP-core configured flag',
-									'ai-provider-for-chatgpt'
-								) }
-							</th>
-							<td>
-								<code>
-									{ diagnostics.data.core_api_key_option
-										? '✓ set'
-										: '✗ empty (connector will show as Setup)' }
-								</code>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">
-								{ __(
 									'Registry hasProvider',
 									'ai-provider-for-chatgpt'
 								) }

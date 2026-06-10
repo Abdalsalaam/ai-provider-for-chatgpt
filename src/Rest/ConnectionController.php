@@ -464,21 +464,18 @@ class ConnectionController extends WP_REST_Controller {
 			}
 		}
 
-		$option_value = get_option( TokenStore::CORE_API_KEY_OPTION, '' );
-
 		return array(
-			'connected'             => $connected,
-			'email'                 => $email,
-			'account_id'            => $account_id,
-			'plan_type'             => $plan,
-			'is_fedramp'            => $is_fedramp,
-			'id_token_expired'      => $id_expired,
-			'last_refresh'          => 0 !== $this->store->get_last_refresh_timestamp()
+			'connected'        => $connected,
+			'email'            => $email,
+			'account_id'       => $account_id,
+			'plan_type'        => $plan,
+			'is_fedramp'       => $is_fedramp,
+			'id_token_expired' => $id_expired,
+			'last_refresh'     => 0 !== $this->store->get_last_refresh_timestamp()
 				? $this->store->get_last_refresh_timestamp()
 				: null,
-			'oauth_client_id'       => oauth_client_id(),
-			'has_core_api_key_flag' => is_string( $option_value ) && '' !== $option_value,
-			'provider'              => array(
+			'oauth_client_id'  => oauth_client_id(),
+			'provider'         => array(
 				'registered' => $has_registered,
 				'configured' => $is_configured,
 			),

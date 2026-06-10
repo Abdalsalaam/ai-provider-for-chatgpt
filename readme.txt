@@ -3,7 +3,7 @@ Contributors: abdalsalaam
 Tags: ai, chatgpt, openai, ai-provider, chatbot
 Requires at least: 6.9
 Tested up to: 7.0
-Stable tag: 0.1.2
+Stable tag: 0.1.3
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -89,6 +89,10 @@ These services are provided by OpenAI. By connecting an account and using this p
 
 == Changelog ==
 
+= 0.1.3 =
+
+* Removed the direct reads of the core `connectors_ai_chatgpt_api_key` option from the connection and diagnostics REST endpoints. The connector's configured state is now read solely through the AI Client API (`isProviderConfigured()`); the option is still written so the WordPress AI plugin can detect the connector's credentials, but it is no longer read back by this plugin.
+
 = 0.1.2 =
 
 * Prefixed all plugin-owned options, transients, and hooks with `halawa_chatgpt_` to avoid collisions in WordPress's shared namespaces.
@@ -109,6 +113,9 @@ These services are provided by OpenAI. By connecting an account and using this p
 * Default-model selection under Settings → ChatGPT.
 
 == Upgrade Notice ==
+
+= 0.1.3 =
+The plugin no longer reads the core connector option directly; configured state comes from the AI Client API.
 
 = 0.1.2 =
 Unique `halawa_chatgpt_` prefixes, fuller external-service documentation, a clearer public pairing endpoint, and uninstall cleanup.

@@ -109,9 +109,6 @@ class DiagnosticsController extends WP_REST_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function fast_checks(): WP_REST_Response {
-		$option_value     = get_option( TokenStore::CORE_API_KEY_OPTION, '' );
-		$has_api_key_flag = is_string( $option_value ) && '' !== $option_value;
-
 		$has_provider     = false;
 		$is_configured    = false;
 		$registry_error   = null;
@@ -140,13 +137,12 @@ class DiagnosticsController extends WP_REST_Controller {
 
 		return new WP_REST_Response(
 			array(
-				'core_api_key_option' => $has_api_key_flag,
-				'registry'            => array(
+				'registry'   => array(
 					'has'        => $has_provider,
 					'configured' => $is_configured,
 					'error'      => $registry_error,
 				),
-				'sdk_models'          => array(
+				'sdk_models' => array(
 					'count'  => $model_count,
 					'sample' => $model_ids,
 					'error'  => $sdk_error,
