@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".wordpress.org/banner-772x250.png" alt="AI Provider for ChatGPT" width="772">
+</p>
+
 # AI Provider for ChatGPT
 
 A WordPress AI provider plugin that lets WP 7.0's built-in AI features call OpenAI using your **ChatGPT account** (Free / Plus / Pro) instead of an API key. Requests are routed through the same backend Codex CLI uses, so usage is billed against your existing ChatGPT subscription.

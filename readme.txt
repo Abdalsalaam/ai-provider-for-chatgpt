@@ -23,7 +23,7 @@ Any plugin or theme that uses the AI Client can call ChatGPT models the same way
 * Function calling and tool use
 * Structured output via JSON schema
 * Dynamic model discovery from the connected account
-* Settings screen for connecting an account and selecting a default model
+* Settings screen for connecting an account, with built-in connection diagnostics
 
 **Requirements:**
 
@@ -40,7 +40,7 @@ When this plugin is used, prompts and content you send through the AI Client are
 1. Upload the plugin files to `/wp-content/plugins/ai-provider-for-chatgpt/`, or install through the WordPress plugin browser.
 2. Activate the plugin through the **Plugins** menu in WordPress.
 3. Visit **Settings → ChatGPT** and follow the on-screen instructions to connect a ChatGPT account.
-4. Optionally pick a default model from the same screen.
+4. Any plugin or theme that uses the WordPress AI Client can now generate text with the ChatGPT models available to your account.
 
 == Frequently Asked Questions ==
 
@@ -85,7 +85,8 @@ These services are provided by OpenAI. By connecting an account and using this p
 
 == Screenshots ==
 
-1. WordPress dashboard - Settings → ChatGPT screen.
+1. ChatGPT registers as a first-class connector and appears in the WordPress AI connectors list, alongside the other providers.
+2. The ChatGPT connector wizard and built-in diagnostics — connect your account with a single command, then confirm the provider is live and that its models were discovered.
 
 == Changelog ==
 
