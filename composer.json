@@ -2,7 +2,7 @@
     "name": "abdalsalaam/ai-provider-for-chatgpt",
     "description": "AI Provider for ChatGPT for the PHP AI Client SDK.",
     "license": "GPL-2.0-or-later",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "keywords": [
         "ai",
         "chatgpt",
