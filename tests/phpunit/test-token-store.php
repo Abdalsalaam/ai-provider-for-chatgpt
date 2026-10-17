@@ -82,7 +82,7 @@ class Test_Token_Store extends Test_Case {
 	}
 
 	/**
-	 * A Codex-era record reads as absent and is flagged as legacy.
+	 * A 0.1.x record reads as absent and is flagged as legacy.
 	 */
 	public function test_legacy_record() {
 		update_option(

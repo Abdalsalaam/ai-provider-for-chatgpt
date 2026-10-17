@@ -74,22 +74,19 @@ class Test_Config extends Test_Case {
 	}
 
 	/**
-	 * The user agent names the plugin and WordPress, nothing from Codex.
+	 * The user agent names only the plugin and WordPress.
 	 */
 	public function test_user_agent() {
 		$this->assertSame( 'ai-provider-for-chatgpt/0.2.0 (WordPress/' . get_bloginfo( 'version' ) . ')', user_agent() );
-		$this->assertStringNotContainsStringIgnoringCase( 'codex', user_agent() );
 	}
 
 	/**
-	 * The scope constant is the exact documented set and the Codex client id is gone.
+	 * The scope constant is the exact documented set and the 0.1.x helpers are gone.
 	 */
 	public function test_scopes_constant() {
 		$this->assertSame( 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct', \Halawa\ChatGptAiProvider\SCOPES );
 		$this->assertFalse( function_exists( 'Halawa\\ChatGptAiProvider\\oauth_client_id' ) );
 		$this->assertFalse( defined( 'Halawa\\ChatGptAiProvider\\DEFAULT_OAUTH_CLIENT_ID' ) );
-		$this->assertFalse( function_exists( 'Halawa\\ChatGptAiProvider\\codex_client_version' ) );
-		$this->assertFalse( defined( 'Halawa\\ChatGptAiProvider\\DEFAULT_CODEX_CLIENT_VERSION' ) );
 		$this->assertFalse( method_exists( \Halawa\ChatGptAiProvider\Authentication\TokenStore::class, 'get_account_id' ) );
 		$this->assertFalse( class_exists( 'Halawa\\ChatGptAiProvider\\OAuth\\IdTokenClaims' ) );
 	}

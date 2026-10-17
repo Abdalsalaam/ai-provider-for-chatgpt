@@ -69,7 +69,7 @@ class TokenStore {
 	 *
 	 * @since 0.2.0
 	 *
-	 * @return bool True for a 0.1.x record or an unreadable one.
+	 * @return bool True for a legacy or unreadable record.
 	 */
 	public function has_legacy_record(): bool {
 		$raw = get_option( self::OPTION_NAME, '' );
