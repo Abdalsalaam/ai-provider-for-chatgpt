@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: AI Provider for ChatGPT
+ * Plugin Name: AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed
  * Plugin URI: https://github.com/Abdalsalaam/ai-provider-for-chatgpt
  * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9
@@ -207,8 +207,7 @@ add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' 
  * @return void
  */
 function activate(): void {
-	$store = new TokenStore();
-	if ( null !== $store->get() && ! $store->needs_signin() ) {
+	if ( ( new TokenStore() )->is_connected() ) {
 		TokenRefresher::schedule();
 	}
 }

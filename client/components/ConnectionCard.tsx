@@ -92,7 +92,7 @@ export function ConnectionCard( { data, apply, refetch }: Props ) {
 			} else {
 				void dispatch( noticesStore ).createWarningNotice(
 					__(
-						'Disconnected here, but ChatGPT did not confirm the revocation. You can remove the app under ChatGPT Settings > Usage.',
+						'Disconnected here, but ChatGPT did not confirm the revocation. You can remove the app in ChatGPT under Settings > Security and login > Sign in with ChatGPT.',
 						'ai-provider-for-chatgpt'
 					),
 					{

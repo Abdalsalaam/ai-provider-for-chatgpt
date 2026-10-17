@@ -365,4 +365,34 @@ class Test_Upgrade extends Test_Case {
 		$this->assertSame( 10, has_action( 'admin_post_' . Upgrade::DISMISS_ACTION, array( $upgrade, 'dismiss' ) ) );
 		$this->assertSame( 10, has_action( 'wp_ajax_' . Upgrade::DISMISS_ACTION, array( $upgrade, 'dismiss_ajax' ) ) );
 	}
+
+	/**
+	 * A signed-out registration is kept by the upgrade and does not answer the notice.
+	 */
+	public function test_signed_out_registration_is_kept_and_notice_stays() {
+		( new TokenStore() )->save(
+			array(
+				'client_id'     => 'oaiapp_test',
+				'subject'       => 'user_test',
+				'email'         => 'user@example.com',
+				'access_token'  => 'fake-access',
+				'refresh_token' => 'fake-refresh',
+				'id_token'      => 'fake.id.token',
+				'expires_at'    => time() + 3600,
+			)
+		);
+		( new TokenStore() )->sign_out();
+		delete_option( Upgrade::VERSION_OPTION );
+
+		( new Upgrade() )->maybe_run();
+
+		$this->assertFalse( ( new TokenStore() )->has_legacy_record() );
+		$this->assertSame( 'oaiapp_test', ( new TokenStore() )->get_client_id() );
+		$this->assertSame( 'absent', get_option( Upgrade::NOTICE_OPTION, 'absent' ) );
+
+		update_option( Upgrade::NOTICE_OPTION, 1, false );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->assertStringContainsString( 'is-dismissible', get_echo( array( new Upgrade(), 'render_notice' ) ) );
+		$this->assertSame( '1', (string) get_option( Upgrade::NOTICE_OPTION ) );
+	}
 }

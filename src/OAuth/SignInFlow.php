@@ -198,7 +198,7 @@ final class SignInFlow {
 		$subject = is_string( $claims['sub'] ?? null ) ? $claims['sub'] : '';
 		$stored  = $this->store->get_subject();
 		if ( null !== $stored && ! hash_equals( $stored, $subject ) ) {
-			throw new OAuthException( 'account_mismatch', 'That is a different ChatGPT account. Disconnect first.' );
+			throw new OAuthException( 'account_mismatch', 'That is a different ChatGPT account. To switch accounts, click Use a different ChatGPT account on the settings page, then sign in again.' );
 		}
 
 		$record = array(

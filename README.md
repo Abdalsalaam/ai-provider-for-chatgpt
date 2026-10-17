@@ -2,7 +2,7 @@
   <img src=".wordpress.org/banner-772x250.png" alt="AI Provider for ChatGPT" width="772">
 </p>
 
-# AI Provider for ChatGPT
+# AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed
 
 A WordPress AI provider plugin that lets the WordPress AI Client call OpenAI models with your **ChatGPT plan** instead of an API key. You connect with OpenAI's [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source) flow for open-source apps; requests go to `https://api.openai.com/v1` and are billed to your ChatGPT Plus, Pro or Go plan.
 
@@ -34,7 +34,7 @@ admin pastes that address  ------->  check the address and state
 AI Client request  --------------->  Bearer token, refresh when due  -----> api.openai.com/v1
                                                                             /responses, /models
 weekly cron  --------------------->  refresh under a lock  ---------------> auth.openai.com
-"Disconnect"  -------------------->  revoke, then clear  -----------------> auth.openai.com
+"Disconnect"  -------------------->  revoke, keep registration  ---------> auth.openai.com
 ```
 
 On the first sign-in OpenAI registers the plugin as an agent named "AI Provider for ChatGPT" on your account and issues a client id for this site. The browser never sees a token: the pasted address only carries a one-time code that is useless without the PKCE verifier the server kept.
@@ -95,7 +95,7 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 | Route | Method | Purpose |
 | --- | --- | --- |
 | `/connection` | GET | Connection status |
-| `/connection` | DELETE | Revoke at OpenAI and disconnect |
+| `/connection` | DELETE | Revoke at OpenAI and sign out, keeping the registration; `forget: true` also removes the registration |
 | `/connection/sign-in` | POST | Start a sign-in, returns the authorize URL |
 | `/connection/callback` | POST | Finish a sign-in with the pasted `callback_url` |
 | `/connection/refresh` | POST | Refresh the tokens now |
@@ -105,10 +105,11 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 
 ## Security model
 
+- **No developer access.** This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. The site talks to OpenAI directly and contacts no other service. The connection cannot read your ChatGPT conversations or memories ([OpenAI help](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites); the [Sign in with ChatGPT docs](https://developers.openai.com/siwc/token-sharing-open-source) say it "does not grant access to their ChatGPT conversations or other account context").
 - **Token storage.** The token record is encrypted at rest with `sodium_crypto_secretbox`, using a 32-byte key derived from your `AUTH_KEY` and `LOGGED_IN_KEY` salts, so a database dump alone does not reveal the tokens. The plugin refuses to read or write tokens when those salts are missing, shorter than 32 characters, or still set to the `wp-config.php` placeholder.
 - **Sign-in.** State, nonce and the PKCE verifier stay on the server, one pending sign-in per administrator, valid for 10 minutes and usable once. The pasted address must match the expected redirect exactly. The ID token is verified against OpenAI's published keys (signature, issuer, audience, expiry, nonce) before anything is saved.
 - **Refresh.** Tokens are refreshed when the access token is near expiry and once a week by cron, under a database lock so two requests never use the same refresh token. If OpenAI ends the session, the connection is marked as needing a new sign-in and no further requests are sent.
-- **Disconnect.** The refresh token is revoked at OpenAI before the local record is deleted.
+- **Disconnect.** The refresh token is revoked at OpenAI, then the tokens are deleted. The registration (issued client id, site id, and the account's id, email and name) is kept, so signing in again reuses it for the same account. **Use a different ChatGPT account** also deletes the site's copy of the registration (the issued client id and the account's id, email and name); the app stays listed under ChatGPT **Settings > Security and login > Sign in with ChatGPT**, where you can disconnect it.
 - **Requests.** Every `/responses` request is sent with `store: false`.
 
 ## Troubleshooting
@@ -119,8 +120,9 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 - **No ChatGPT tab opened** (for example, the browser blocked the pop-up). Under "Didn't see the ChatGPT tab?", click **Open ChatGPT sign-in**. It reopens the same sign-in page; it does not start a new attempt or reset the 10-minute countdown. Once the attempt has expired the button is disabled; click **Start again**.
 - **The sign-in attempt expired, or "No sign-in in progress".** Each attempt is valid for 10 minutes and once. Click **Start again**.
 - **"Your ChatGPT account did not grant plan usage".** Plan usage needs ChatGPT Plus, Pro or Go.
-- **"ChatGPT session ended".** OpenAI ended the session (for example after you disconnected the app in ChatGPT). Sign in again under **Settings > ChatGPT**.
-- **Usage limit reached.** Review your usage at [chatgpt.com/settings/usage](https://chatgpt.com/settings/usage).
+- **"That is a different ChatGPT account."** The site keeps the registration of the account it was connected to, and a new sign-in must use that account. To connect another account, click **Use a different ChatGPT account** on the settings page: it revokes any stored tokens and deletes the site's copy of the registration (the issued client id and the account's id, email and name); the app stays listed under ChatGPT **Settings > Security and login > Sign in with ChatGPT**, where you can disconnect it. Then sign in with the other account.
+- **"ChatGPT session ended".** OpenAI ended the session (for example after you disconnected the app under ChatGPT **Settings > Security and login > Sign in with ChatGPT**). Sign in again under **Settings > ChatGPT**.
+- **Usage limit reached.** Review your usage and per-app limits at [chatgpt.com/settings/usage](https://chatgpt.com/settings/usage).
 - **The model picker shows only the fallback models.** The SDK caches the model list for 24 hours, so after a failed `/v1/models` request the fallback list can stay until the cache is cleared. Clear it under **Settings > ChatGPT**, **Developer tools** menu, **Clear cached model list**.
 - **Admin notice "the admin UI bundle is missing".** Run `npm install && npm run build` in the plugin directory.
 
