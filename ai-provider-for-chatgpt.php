@@ -25,6 +25,7 @@ use Halawa\ChatGptAiProvider\Admin\Assets;
 use Halawa\ChatGptAiProvider\Admin\SettingsPage;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\Cache\TransientCache;
+use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 use Halawa\ChatGptAiProvider\Rest\CacheController;
 use Halawa\ChatGptAiProvider\Rest\ConnectionController;
@@ -231,6 +232,8 @@ function register_rest_controllers(): void {
 }
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_controllers' );
+
+add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' ) );
 
 if ( is_admin() ) {
 	( new SettingsPage() )->register();
