@@ -470,7 +470,13 @@ class Test_Sign_In_Flow extends Test_Case {
 		( new SignInFlow( $this->store ) )->start( self::USER );
 		$this->queue_exchange( array( 'sub' => 'user_2' ) );
 
-		$this->assertSame( 'account_mismatch', $this->complete_error( $this->callback_url() ) );
+		try {
+			( new SignInFlow( $this->store ) )->complete( self::USER, $this->callback_url() );
+			$this->fail( 'Expected account_mismatch' );
+		} catch ( OAuthException $e ) {
+			$this->assertSame( 'account_mismatch', $e->getErrorCode() );
+			$this->assertSame( 'That is a different ChatGPT account. To switch accounts, click Use a different ChatGPT account on the settings page, then sign in again.', $e->getMessage() );
+		}
 		$this->assertFalse( $this->store->is_connected() );
 		$this->assertSame( 'user_1', $this->store->get_subject() );
 	}
