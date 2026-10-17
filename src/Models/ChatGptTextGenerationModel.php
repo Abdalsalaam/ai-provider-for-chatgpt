@@ -20,7 +20,6 @@ use WordPress\AiClient\Providers\Http\DTO\Request;
 use WordPress\AiClient\Providers\Http\DTO\Response;
 use WordPress\AiClient\Providers\Http\Enums\HttpMethodEnum;
 use WordPress\AiClient\Providers\Http\Exception\ResponseException;
-use WordPress\AiClient\Providers\Http\Util\ResponseUtil;
 use WordPress\AiClient\Providers\Models\TextGeneration\Contracts\TextGenerationModelInterface;
 use WordPress\AiClient\Results\DTO\Candidate;
 use WordPress\AiClient\Results\DTO\GenerativeAiResult;
@@ -74,15 +73,38 @@ use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGenerationModelInterface {
 
 	/**
-	 * Substitutes the OAuth-aware authenticator for the API-key placeholder
-	 * the SDK auto-injects.
+	 * Account authentication used for every request.
+	 *
+	 * @var ChatGptAccountAuthentication|null
+	 */
+	private $account_authentication;
+
+	/**
+	 * Returns the account authentication, creating it on first use.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @return RequestAuthenticationInterface The OAuth-aware authenticator.
+	 * @return RequestAuthenticationInterface The account authentication.
 	 */
 	public function getRequestAuthentication(): RequestAuthenticationInterface {
-		return new ChatGptAccountAuthentication( new TokenStore() );
+		if ( null === $this->account_authentication ) {
+			$this->account_authentication = new ChatGptAccountAuthentication( new TokenStore() );
+		}
+		return $this->account_authentication;
+	}
+
+	/**
+	 * Keeps an account authentication and ignores the registry's API key placeholder.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param RequestAuthenticationInterface $request_authentication The authentication.
+	 * @return void
+	 */
+	public function setRequestAuthentication( RequestAuthenticationInterface $request_authentication ): void {
+		if ( $request_authentication instanceof ChatGptAccountAuthentication ) {
+			$this->account_authentication = $request_authentication;
+		}
 	}
 
 	/**
@@ -92,59 +114,48 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	 *
 	 * @param array $prompt The prompt messages.
 	 * @return GenerativeAiResult
-	 * @throws RuntimeException When the Codex backend returns an unrecoverable error.
+	 * @throws RuntimeException When the API returns an error.
 	 */
 	public function generateTextResult( array $prompt ): GenerativeAiResult {
 		return $this->sendWithRefreshRetry( $prompt, true );
 	}
 
 	/**
-	 * Sends the generation request, refreshing the access token and retrying
-	 * once if the server responds with HTTP 401.
+	 * Sends the request and retries once with a refreshed token after HTTP 401.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @param array $prompt      The prompt messages.
 	 * @param bool  $allow_retry Whether a refresh-and-retry is still allowed.
 	 * @return GenerativeAiResult The parsed result.
-	 * @throws RuntimeException When the request fails after a refresh-and-retry.
+	 * @throws RuntimeException When the API returns an error.
 	 */
 	private function sendWithRefreshRetry( array $prompt, bool $allow_retry ): GenerativeAiResult {
-		$http_transporter = $this->getHttpTransporter();
-		$auth            = $this->getRequestAuthentication();
-
-		$request  = new Request(
-			HttpMethodEnum::POST(),
-			ChatGptProvider::url( 'responses' ),
-			array(
-				'Content-Type' => 'application/json',
-				'Accept'       => 'text/event-stream',
-			),
-			$this->prepareGenerateTextParams( $prompt ),
-			$this->getRequestOptions()
+		$auth     = $this->getRequestAuthentication();
+		$request  = $auth->authenticateRequest(
+			new Request(
+				HttpMethodEnum::POST(),
+				ChatGptProvider::url( 'responses' ),
+				array(
+					'Content-Type' => 'application/json',
+					'Accept'       => 'text/event-stream',
+				),
+				$this->prepareGenerateTextParams( $prompt ),
+				$this->getRequestOptions()
+			)
 		);
-		$request  = $auth->authenticateRequest( $request );
-		$response = $http_transporter->send( $request );
+		$response = $this->getHttpTransporter()->send( $request );
+		$status   = $response->getStatusCode();
 
-		if ( $allow_retry && $response->getStatusCode() === 401 && $auth instanceof ChatGptAccountAuthentication ) {
-			$auth->force_refresh();
+		if ( 401 === $status && $allow_retry && $auth instanceof ChatGptAccountAuthentication ) {
+			$auth->force_refresh( (string) preg_replace( '/^Bearer\s+/i', '', (string) $request->getHeaderAsString( 'Authorization' ) ) );
 			return $this->sendWithRefreshRetry( $prompt, false );
 		}
-
-		$status = $response->getStatusCode();
 		if ( $status < 200 || $status >= 300 ) {
-			// Surface the server's actual error body — the SDK's generic
-			// "Bad Request (400)" hides the diagnostic.
-			$body = (string) $response->getBody();
 			throw new RuntimeException(
-				sprintf(
-					'ChatGPT /responses returned HTTP %d. Body: %s',
-					(int) $status,
-					esc_html( substr( $body, 0, 800 ) )
-				)
+				esc_html( ResponsesError::message( $status, (string) $response->getBody(), ResponsesError::lower_headers( $response->getHeaders() ) ) )
 			);
 		}
-		ResponseUtil::throwIfNotSuccessful( $response );
 		return $this->parseStreamingResponseToGenerativeAiResult( $response );
 	}
 
