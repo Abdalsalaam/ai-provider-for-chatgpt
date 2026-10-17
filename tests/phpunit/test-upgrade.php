@@ -269,6 +269,91 @@ class Test_Upgrade extends Test_Case {
 	}
 
 	/**
+	 * Runs the AJAX dismissal and returns its JSON output.
+	 *
+	 * @param string $nonce Nonce sent with the request.
+	 * @return array Decoded response.
+	 */
+	private function run_ajax_dismiss( string $nonce ): array {
+		$_REQUEST['_ajax_nonce'] = $nonce;
+		add_filter( 'wp_doing_ajax', '__return_true' );
+		add_filter(
+			'wp_die_ajax_handler',
+			static function () {
+				return static function () {
+					throw new WPDieException( 'ajax-die' );
+				};
+			}
+		);
+		ob_start();
+		try {
+			( new Upgrade() )->dismiss_ajax();
+		} catch ( WPDieException $e ) {
+			unset( $e );
+		} finally {
+			$output = (string) ob_get_clean();
+			unset( $_REQUEST['_ajax_nonce'] );
+		}
+		$decoded = json_decode( $output, true );
+		return is_array( $decoded ) ? $decoded : array( 'raw' => $output );
+	}
+
+	/**
+	 * The notice's close button clears the flag for good through AJAX.
+	 */
+	public function test_ajax_dismiss_clears_the_flag() {
+		update_option( Upgrade::NOTICE_OPTION, 1, false );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$response = $this->run_ajax_dismiss( wp_create_nonce( Upgrade::DISMISS_ACTION ) );
+
+		$this->assertTrue( $response['success'] );
+		$this->assertSame( 'absent', get_option( Upgrade::NOTICE_OPTION, 'absent' ) );
+	}
+
+	/**
+	 * A wrong nonce keeps the flag.
+	 */
+	public function test_ajax_dismiss_rejects_a_bad_nonce() {
+		update_option( Upgrade::NOTICE_OPTION, 1, false );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$this->run_ajax_dismiss( 'bad-nonce' );
+
+		$this->assertSame( '1', (string) get_option( Upgrade::NOTICE_OPTION ) );
+	}
+
+	/**
+	 * A user without manage_options keeps the flag, even with a valid nonce.
+	 */
+	public function test_ajax_dismiss_requires_manage_options() {
+		update_option( Upgrade::NOTICE_OPTION, 1, false );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+
+		$response = $this->run_ajax_dismiss( wp_create_nonce( Upgrade::DISMISS_ACTION ) );
+
+		$this->assertFalse( $response['success'] );
+		$this->assertSame( '1', (string) get_option( Upgrade::NOTICE_OPTION ) );
+	}
+
+	/**
+	 * The notice carries the script that sends the close button to the AJAX action.
+	 */
+	public function test_notice_wires_the_close_button() {
+		update_option( Upgrade::NOTICE_OPTION, 1, false );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$html = get_echo( array( new Upgrade(), 'render_notice' ) );
+
+		$this->assertStringContainsString( 'id="halawa-chatgpt-upgrade-notice"', $html );
+		$this->assertStringContainsString( '<script', $html );
+		$this->assertStringContainsString( '.notice-dismiss', $html );
+		$this->assertStringContainsString( '"' . Upgrade::DISMISS_ACTION . '"', $html );
+		$this->assertStringContainsString( '"' . wp_create_nonce( Upgrade::DISMISS_ACTION ) . '"', $html );
+		$this->assertStringContainsString( wp_json_encode( admin_url( 'admin-ajax.php' ) ), $html );
+	}
+
+	/**
 	 * The hooks are registered for admin requests.
 	 */
 	public function test_register_adds_hooks() {
@@ -278,5 +363,6 @@ class Test_Upgrade extends Test_Case {
 		$this->assertSame( 10, has_action( 'admin_init', array( $upgrade, 'on_admin_init' ) ) );
 		$this->assertSame( 10, has_action( 'admin_notices', array( $upgrade, 'render_notice' ) ) );
 		$this->assertSame( 10, has_action( 'admin_post_' . Upgrade::DISMISS_ACTION, array( $upgrade, 'dismiss' ) ) );
+		$this->assertSame( 10, has_action( 'wp_ajax_' . Upgrade::DISMISS_ACTION, array( $upgrade, 'dismiss_ajax' ) ) );
 	}
 }

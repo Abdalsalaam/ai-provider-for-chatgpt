@@ -1,15 +1,22 @@
 import { useState } from '@wordpress/element';
 import { TextControl } from '@wordpress/components';
-import { Button, Link, Notice } from '@wordpress/ui';
+import { Button, Notice } from '@wordpress/ui';
 import { __, sprintf } from '@wordpress/i18n';
 
 import { EMPTY_FIELD, useSignIn } from '../hooks/useSignIn';
 import { formatClock } from '../utils';
 import { ChatGptIcon } from './ChatGptIcon';
-import type { ConnectionStatus } from '../types';
+import type { ConnectionStatus, SignInStart } from '../types';
 
 const ELIGIBILITY_URL =
 	'https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites';
+
+// Reopens the current attempt's sign-in page without starting a new attempt.
+function reopenSignIn( start: SignInStart | null ) {
+	if ( start ) {
+		window.open( start.authorize_url, '_blank', 'noopener' );
+	}
+}
 
 type Props = {
 	status: ConnectionStatus;
@@ -177,21 +184,25 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 							) }
 						</strong>
 					</p>
-					<p>
-						{ __(
-							'If no new tab opened, use this link:',
-							'ai-provider-for-chatgpt'
-						) }{ ' ' }
-						<Link
-							href={ signIn.start.authorize_url }
-							openInNewTab
-							rel="noopener noreferrer"
-						>
+					<p className="ai-provider-for-chatgpt-actions-row">
+						<span>
 							{ __(
-								'Open the ChatGPT sign-in page',
+								"Didn't see the ChatGPT tab?",
 								'ai-provider-for-chatgpt'
 							) }
-						</Link>
+						</span>
+						<Button
+							variant="outline"
+							tone="neutral"
+							disabled={ blocked }
+							onClick={ () => reopenSignIn( signIn.start ) }
+						>
+							<ChatGptIcon className="ai-provider-for-chatgpt-continue-icon" />
+							{ __(
+								'Open ChatGPT sign-in',
+								'ai-provider-for-chatgpt'
+							) }
+						</Button>
 					</p>
 					<TextControl
 						__next40pxDefaultSize
