@@ -17,7 +17,7 @@ use WP_REST_Response;
 use WP_REST_Server;
 use WordPress\AiClient\AiClient;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
-use Halawa\ChatGptAiProvider\Cache\TransientCache;
+use Halawa\ChatGptAiProvider\Cache\ModelCache;
 use Halawa\ChatGptAiProvider\OAuth\CallbackUrl;
 use Halawa\ChatGptAiProvider\OAuth\OAuthException;
 use Halawa\ChatGptAiProvider\OAuth\SignInFlow;
@@ -312,7 +312,7 @@ class ConnectionController extends WP_REST_Controller {
 	 * @return void
 	 */
 	private function clear_model_cache(): void {
-		( new TransientCache() )->clear();
+		ModelCache::clear();
 	}
 
 	/**

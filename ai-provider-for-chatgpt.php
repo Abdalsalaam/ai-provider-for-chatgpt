@@ -5,7 +5,7 @@
  * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9
  * Requires PHP: 7.4
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Abdalsalaam Halawa
  * Author URI: https://halawa.io
  * License: GPL-2.0-or-later
@@ -43,7 +43,7 @@ require_once __DIR__ . '/vendor/autoload.php';
  *
  * @since 1.0.0
  */
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 
 /**
  * Sign in with ChatGPT endpoints and identifiers (OpenAI open-source app flow).
@@ -127,6 +127,29 @@ function user_agent(): string {
 }
 
 /**
+ * Tells whether TransientCache matches the cache interface this AI Client expects.
+ *
+ * Core bundles the SDK with prefixed PSR interfaces that TransientCache does not
+ * implement, and loading it without the plain interface is a fatal error.
+ *
+ * @since 1.0.1
+ *
+ * @return bool True when TransientCache can be passed to AiClient::setCache().
+ */
+function can_use_transient_cache(): bool {
+	if ( ! interface_exists( 'Psr\\SimpleCache\\CacheInterface' ) ) {
+		return false;
+	}
+	try {
+		$params = ( new \ReflectionMethod( AiClient::class, 'setCache' ) )->getParameters();
+		$type   = isset( $params[0] ) ? $params[0]->getType() : null;
+	} catch ( \ReflectionException $e ) {
+		return false;
+	}
+	return $type instanceof \ReflectionNamedType && 'Psr\\SimpleCache\\CacheInterface' === ltrim( $type->getName(), '\\' );
+}
+
+/**
  * Registers the ChatGPT provider with the WordPress AI Client.
  *
  * Registration happens unconditionally so the connector is discoverable in
@@ -147,7 +170,7 @@ function register_provider(): void {
 	// persisted across requests. Without this the SDK falls back to a
 	// per-request in-memory array, which means the /models endpoint
 	// is hit on every admin page load. Idempotent if called more than once.
-	if ( null === AiClient::getCache() ) {
+	if ( null === AiClient::getCache() && can_use_transient_cache() ) {
 		AiClient::setCache( new TransientCache() );
 	}
 

@@ -10,7 +10,7 @@ use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 
 /**
- * Covers the 0.1.x to 1.0.0 migration and the reconnect notice.
+ * Covers the 0.1.x to 1.0 migration and the reconnect notice.
  */
 class Test_Upgrade extends Test_Case {
 
@@ -77,7 +77,7 @@ class Test_Upgrade extends Test_Case {
 		$this->assertSame( array(), self::option_names( '%halawa\_chatgpt\_pair%' ) );
 		$this->assertSame( array(), self::option_names( '%ai\_client\_%' ) );
 		$this->assertSame( '1', (string) get_option( Upgrade::NOTICE_OPTION ) );
-		$this->assertSame( '1.0.0', get_option( Upgrade::VERSION_OPTION ) );
+		$this->assertSame( \Halawa\ChatGptAiProvider\VERSION, get_option( Upgrade::VERSION_OPTION ) );
 		$this->assertFalse( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
 	}
 
@@ -158,7 +158,7 @@ class Test_Upgrade extends Test_Case {
 		$this->assertSame( TokenStore::CORE_API_KEY_PLACEHOLDER, get_option( TokenStore::CORE_API_KEY_OPTION ) );
 		$this->assertNotFalse( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
 		$this->assertSame( 'absent', get_option( Upgrade::NOTICE_OPTION, 'absent' ) );
-		$this->assertSame( '1.0.0', get_option( Upgrade::VERSION_OPTION ) );
+		$this->assertSame( \Halawa\ChatGptAiProvider\VERSION, get_option( Upgrade::VERSION_OPTION ) );
 	}
 
 	/**
@@ -167,7 +167,7 @@ class Test_Upgrade extends Test_Case {
 	public function test_fresh_install_sets_version_without_notice() {
 		$this->assertTrue( ( new Upgrade() )->maybe_run() );
 
-		$this->assertSame( '1.0.0', get_option( Upgrade::VERSION_OPTION ) );
+		$this->assertSame( \Halawa\ChatGptAiProvider\VERSION, get_option( Upgrade::VERSION_OPTION ) );
 		$this->assertSame( 'absent', get_option( Upgrade::NOTICE_OPTION, 'absent' ) );
 	}
 
@@ -265,7 +265,7 @@ class Test_Upgrade extends Test_Case {
 	public function test_admin_init_runs_the_migration() {
 		( new Upgrade() )->on_admin_init();
 
-		$this->assertSame( '1.0.0', get_option( Upgrade::VERSION_OPTION ) );
+		$this->assertSame( \Halawa\ChatGptAiProvider\VERSION, get_option( Upgrade::VERSION_OPTION ) );
 	}
 
 	/**

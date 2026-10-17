@@ -3,7 +3,7 @@ Contributors: abdalsalaam
 Tags: chatgpt, openai, ai, connector, ai-provider
 Requires at least: 6.9
 Tested up to: 7.1
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -123,6 +123,10 @@ These services are provided by OpenAI. By connecting an account and using this p
 
 == Changelog ==
 
+= 1.0.1 =
+
+* Fixed a fatal error on WordPress 7 (Psr\SimpleCache\CacheInterface not found) when updating from 0.1.x with a connected account, connecting or disconnecting.
+
 = 1.0.0 =
 
 * Connect with Sign in with ChatGPT on a guided settings screen: no command line tool, no API key, billed to your ChatGPT Plus, Pro or Go plan.
@@ -156,6 +160,9 @@ These services are provided by OpenAI. By connecting an account and using this p
 * Default-model selection under Settings > ChatGPT.
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+Fixes a fatal error on WordPress 7 when updating from 0.1.x. Update now.
 
 = 1.0.0 =
 Connects with Sign in with ChatGPT. Existing connections must sign in again, and a ChatGPT Plus, Pro or Go plan is required.
