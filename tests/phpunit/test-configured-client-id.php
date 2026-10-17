@@ -5,6 +5,9 @@
  * @package Halawa\ChatGptAiProvider
  */
 
+use Halawa\ChatGptAiProvider\Authentication\TokenStore;
+use Halawa\ChatGptAiProvider\OAuth\SignInFlow;
+
 use function Halawa\ChatGptAiProvider\configured_client_id;
 
 /**
@@ -29,5 +32,18 @@ class Test_Configured_Client_Id extends Test_Case {
 	public function test_empty_constant_is_ignored() {
 		define( 'CHATGPT_OAUTH_CLIENT_ID', '' );
 		$this->assertNull( configured_client_id() );
+	}
+
+	/**
+	 * A configured client id is used without the agent name hint.
+	 */
+	public function test_sign_in_with_configured_client_id() {
+		define( 'CHATGPT_OAUTH_CLIENT_ID', 'oaiapp_configured' );
+		$start = ( new SignInFlow( new TokenStore() ) )->start( 3 );
+		parse_str( (string) wp_parse_url( $start['authorize_url'], PHP_URL_QUERY ), $params );
+		$this->assertSame( 'oaiapp_configured', $params['client_id'] );
+		$this->assertArrayNotHasKey( 'agent_name_hint', $params );
+		$this->assertArrayNotHasKey( 'id_token_hint', $params );
+		$this->assertSame( 'oaiapp_configured', get_transient( SignInFlow::pending_key( 3 ) )['client_id'] );
 	}
 }

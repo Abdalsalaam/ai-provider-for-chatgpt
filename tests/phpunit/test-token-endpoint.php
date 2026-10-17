@@ -242,4 +242,19 @@ class Test_Token_Endpoint extends Test_Case {
 		$this->assertSame( 'http_400', $e->getErrorCode() );
 		$this->assertStringNotContainsString( 'rt_secret', $e->getMessage() );
 	}
+	/**
+	 * Messages stay plain text; escaping happens where they are displayed.
+	 */
+	public function test_error_description_is_not_html_escaped() {
+		$e = $this->failure(
+			Http_Mock::json(
+				array(
+					'error'             => 'invalid_request',
+					'error_description' => "Token isn't valid & see Settings > ChatGPT.",
+				),
+				400
+			)
+		);
+		$this->assertSame( "Token isn't valid & see Settings > ChatGPT.", $e->getMessage() );
+	}
 }
