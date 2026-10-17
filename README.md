@@ -2,7 +2,7 @@
   <img src=".wordpress.org/banner-772x250.png" alt="AI Provider for ChatGPT" width="772">
 </p>
 
-# AI Provider for ChatGPT
+# AI Provider for ChatGPT - Connect Your ChatGPT Plan to WordPress AI
 
 A WordPress AI provider plugin that lets the WordPress AI Client call OpenAI models with your **ChatGPT plan** instead of an API key. You connect with OpenAI's [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source) flow for open-source apps; requests go to `https://api.openai.com/v1` and are billed to your ChatGPT Plus, Pro or Go plan.
 

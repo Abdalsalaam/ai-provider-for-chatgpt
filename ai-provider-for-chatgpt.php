@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: AI Provider for ChatGPT
+ * Plugin Name: AI Provider for ChatGPT - Connect Your ChatGPT Plan to WordPress AI
  * Plugin URI: https://github.com/Abdalsalaam/ai-provider-for-chatgpt
  * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9

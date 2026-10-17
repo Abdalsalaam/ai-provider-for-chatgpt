@@ -1,6 +1,6 @@
-=== AI Provider for ChatGPT ===
+=== AI Provider for ChatGPT - Connect Your ChatGPT Plan to WordPress AI ===
 Contributors: abdalsalaam
-Tags: ai, chatgpt, openai, ai-provider, chatbot
+Tags: chatgpt, openai, ai, connector, ai-provider
 Requires at least: 6.9
 Tested up to: 7.1
 Stable tag: 1.0.0
@@ -8,7 +8,7 @@ Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Adds ChatGPT (OpenAI) as a provider for the WordPress AI Client, connected with Sign in with ChatGPT instead of an API key.
+Connect your ChatGPT Plus, Pro or Go plan to WordPress AI features with Sign in with ChatGPT. No OpenAI API key needed.
 
 == Description ==
 
