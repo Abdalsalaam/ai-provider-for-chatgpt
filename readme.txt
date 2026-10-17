@@ -82,7 +82,7 @@ Tokens are stored in the WordPress options table on your own site, encrypted wit
 
 This plugin connects to services operated by OpenAI, L.L.C. so the WordPress AI Client can use your ChatGPT plan. Nothing is sent to OpenAI until an administrator starts a sign-in. The plugin contacts two OpenAI domains, `auth.openai.com` and `api.openai.com`, and no other third-party service.
 
-* **`https://auth.openai.com/api/accounts/authorize`** is opened in the administrator's browser when they click **Continue with ChatGPT**. The address carries the plugin's client id, the agent name "AI Provider for ChatGPT", a stable id for this site, the requested permissions, a one-time state and nonce, and a PKCE challenge. On a new sign-in for an existing connection it also carries the connected account's email and ID token as hints.
+* **`https://auth.openai.com/api/accounts/authorize`** is opened in the administrator's browser when they click **Continue with ChatGPT**. The address carries the client id, a stable id for this site, the requested permissions, a one-time state and nonce, and a PKCE challenge. On the first sign-in it also carries the agent name "AI Provider for ChatGPT" (not when the `CHATGPT_OAUTH_CLIENT_ID` constant is set). On a new sign-in for an existing connection it carries the connected account's email and ID token as hints.
 * **`POST https://auth.openai.com/api/accounts/oauth/token`** is called from your server when the administrator pastes the sign-in address (sends the client id, the one-time code, the PKCE verifier, the redirect address and the API resource), and when the access token is due for renewal, including a weekly scheduled refresh (sends the client id, the refresh token and the API resource). No prompt or user content is sent.
 * **`GET https://auth.openai.com/.well-known/jwks.json`** is called from your server to fetch OpenAI's public keys and verify the ID token at sign-in. Nothing about your site or account is sent. The keys are cached for 24 hours.
 * **`POST https://auth.openai.com/api/accounts/oauth/revoke`** is called when the administrator clicks **Disconnect** (sends the client id and the refresh token).
@@ -109,7 +109,8 @@ These services are provided by OpenAI. By connecting an account and using this p
 * Removed the Codex client id, the Codex backend, the auth.json import and the pairing command line tool.
 * Existing connections must sign in again after updating; the plugin shows a notice.
 * Free ChatGPT accounts are no longer eligible, because OpenAI grants plan usage only to Plus, Pro and Go.
-* Added a weekly token refresh, a Disconnect button that revokes the connection at OpenAI, and a link to manage usage in ChatGPT.
+* Added a weekly token refresh and a link to manage usage in ChatGPT.
+* Disconnect now revokes the connection at OpenAI.
 * Uninstall now removes every option, transient and scheduled event the plugin creates.
 
 = 0.1.4 =
