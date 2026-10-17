@@ -23,6 +23,7 @@ use WordPress\AiClient\AiClient;
 use WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication;
 use Halawa\ChatGptAiProvider\Admin\Assets;
 use Halawa\ChatGptAiProvider\Admin\SettingsPage;
+use Halawa\ChatGptAiProvider\Admin\Upgrade;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\Cache\TransientCache;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
@@ -235,4 +236,5 @@ add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_controllers' );
 if ( is_admin() ) {
 	( new SettingsPage() )->register();
 	( new Assets() )->register();
+	( new Upgrade() )->register();
 }
