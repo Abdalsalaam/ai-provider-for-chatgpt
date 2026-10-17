@@ -125,19 +125,8 @@ These services are provided by OpenAI. By connecting an account and using this p
 
 = 1.0.0 =
 
-* Connect with Sign in with ChatGPT: click Continue with ChatGPT, approve, and paste the address you land on. No command line tool and no file to copy.
-* Requests go to api.openai.com with the client id OpenAI issues to this site at sign-in, billed to your ChatGPT Plus, Pro or Go plan.
-* Removed the Codex client id, the Codex backend, the auth.json import and the pairing command line tool.
-* Existing connections must sign in again after updating; the plugin shows a notice.
-* Free ChatGPT accounts are no longer eligible, because OpenAI grants plan usage only to Plus, Pro and Go.
-* New settings screen that explains each step before you sign in, with Paste from clipboard and an Open ChatGPT sign-in button if the sign-in tab did not open.
-* A privacy note on the settings screen: the plugin runs only on your website and the plugin developer has no access to your account.
-* Added a weekly token refresh and a link to manage usage in ChatGPT.
-* Disconnect revokes the connection at OpenAI and keeps the registration, so signing in again reuses it. Use a different ChatGPT account forgets it to switch accounts.
-* When the ChatGPT session ends, AI features show "ChatGPT session ended. Sign in again under Settings > ChatGPT." instead of a model error.
-* The model list is cached for an hour instead of being fetched on every request.
-* Renamed the listing to "AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed"; the plugin slug is unchanged.
-* Uninstall now removes every option, transient and scheduled event the plugin creates.
+* Connect with Sign in with ChatGPT on a guided settings screen: no command line tool, no API key, billed to your ChatGPT Plus, Pro or Go plan.
+* Existing connections must sign in again after updating, and Free ChatGPT accounts are no longer eligible.
 
 = 0.1.4 =
 
