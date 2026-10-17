@@ -49,11 +49,7 @@ class Test_Uninstall extends Test_Case {
 		update_option( 'other_plugin_setting', 'keep' );
 		wp_schedule_event( time() + HOUR_IN_SECONDS, 'weekly', 'halawa_chatgpt_refresh_tokens' );
 
-		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
-			define( 'WP_UNINSTALL_PLUGIN', 'ai-provider-for-chatgpt/ai-provider-for-chatgpt.php' );
-		}
-		require_once dirname( __DIR__, 2 ) . '/uninstall.php';
-		wp_cache_flush();
+		self::run_uninstall();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- The test checks the table itself.
 		$left = $wpdb->get_col(
@@ -69,7 +65,99 @@ class Test_Uninstall extends Test_Case {
 			$this->assertSame( 'absent', get_option( $option, 'absent' ), $option );
 		}
 		$this->assertFalse( wp_next_scheduled( 'halawa_chatgpt_refresh_tokens' ) );
+		// A signed-out registration has no refresh token, so nothing is revoked.
+		$this->assertSame( array(), Http_Mock::requests() );
 		$this->assertSame( 'keep', get_transient( 'other_plugin_cache' ) );
 		$this->assertSame( 'keep', get_option( 'other_plugin_setting' ) );
+	}
+
+	/**
+	 * Runs uninstall.php; it can run more than once per process.
+	 */
+	private static function run_uninstall(): void {
+		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+			define( 'WP_UNINSTALL_PLUGIN', 'ai-provider-for-chatgpt/ai-provider-for-chatgpt.php' );
+		}
+		require dirname( __DIR__, 2 ) . '/uninstall.php';
+		wp_cache_flush();
+	}
+
+	/**
+	 * Saves a connected record.
+	 */
+	private static function seed_connected_record(): void {
+		( new Halawa\ChatGptAiProvider\Authentication\TokenStore() )->save(
+			array(
+				'client_id'     => 'oaiapp_test',
+				'subject'       => 'user_test',
+				'scopes'        => array( 'chatgpt.tokens.use.direct' ),
+				'access_token'  => 'fake-access',
+				'refresh_token' => 'fake-refresh',
+				'id_token'      => 'fake.id.token',
+				'expires_at'    => time() + 3600,
+			)
+		);
+	}
+
+	/**
+	 * A connected record is revoked at OpenAI once, then deleted.
+	 */
+	public function test_uninstall_revokes_a_connected_record() {
+		self::seed_connected_record();
+		Http_Mock::queue( Http_Mock::json( array() ) );
+
+		self::run_uninstall();
+
+		$requests = Http_Mock::requests();
+		$this->assertCount( 1, $requests );
+		$this->assertSame( 'https://auth.openai.com/api/accounts/oauth/revoke', $requests[0]['url'] );
+		$this->assertSame( 'POST', $requests[0]['method'] );
+		$this->assertSame(
+			array(
+				'token'           => 'fake-refresh',
+				'token_type_hint' => 'refresh_token',
+				'client_id'       => 'oaiapp_test',
+			),
+			$requests[0]['body']
+		);
+		$this->assertLessThanOrEqual( 5, $requests[0]['args']['timeout'] );
+		$this->assertSame( 'absent', get_option( 'halawa_chatgpt_tokens', 'absent' ) );
+		$this->assertFalse( wp_next_scheduled( 'halawa_chatgpt_refresh_tokens' ) );
+	}
+
+	/**
+	 * A failed revoke does not stop the cleanup.
+	 */
+	public function test_uninstall_deletes_everything_when_revoke_fails() {
+		self::seed_connected_record();
+		Http_Mock::queue( Http_Mock::json( array( 'error' => 'server_error' ), 500 ) );
+
+		self::run_uninstall();
+
+		$this->assertCount( 1, Http_Mock::requests() );
+		$this->assertSame( 'absent', get_option( 'halawa_chatgpt_tokens', 'absent' ) );
+		$this->assertSame( 'absent', get_option( 'connectors_ai_chatgpt_api_key', 'absent' ) );
+	}
+
+	/**
+	 * A network error during the revoke does not stop the cleanup either.
+	 */
+	public function test_uninstall_deletes_everything_when_revoke_errors() {
+		self::seed_connected_record();
+		Http_Mock::queue( new WP_Error( 'http_request_failed', 'timed out' ) );
+
+		self::run_uninstall();
+
+		$this->assertCount( 1, Http_Mock::requests() );
+		$this->assertSame( 'absent', get_option( 'halawa_chatgpt_tokens', 'absent' ) );
+	}
+
+	/**
+	 * Without a record there is nothing to revoke.
+	 */
+	public function test_uninstall_without_record_makes_no_request() {
+		self::run_uninstall();
+
+		$this->assertSame( array(), Http_Mock::requests() );
 	}
 }
