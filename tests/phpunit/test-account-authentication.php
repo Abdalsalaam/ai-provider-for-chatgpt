@@ -255,7 +255,11 @@ class Test_Account_Authentication extends Test_Case {
 	 * Second 401 surfaces the error message.
 	 */
 	public function test_second_401_surfaces_the_error_message() {
-		list( $auth ) = $this->auth( Api_Test_Helpers::connected_store() );
+		$store                    = Api_Test_Helpers::connected_store();
+		list( $auth, $refresher ) = $this->auth( $store );
+		$refresher->on_refresh    = static function () use ( $store ) {
+			$store->update( array( 'access_token' => 'access-2' ) );
+		};
 		Http_Mock::queue( Api_Test_Helpers::response( 401, '{"detail":"Unauthorized"}' ) );
 		Http_Mock::queue( Api_Test_Helpers::response( 401, '{"detail":"Unauthorized"}', array( 'x-oai-request-id' => 'req_7' ) ) );
 		try {
@@ -265,6 +269,22 @@ class Test_Account_Authentication extends Test_Case {
 			$this->assertSame( 'ChatGPT: Unauthorized (request id req_7)', $e->getMessage() );
 		}
 		$this->assertCount( 2, Http_Mock::requests() );
+	}
+
+	/**
+	 * A 401 whose refresh leaves the same token raises the 401 without a retry.
+	 */
+	public function test_401_without_a_new_token_raises_without_a_retry() {
+		list( $auth, $refresher ) = $this->auth( Api_Test_Helpers::connected_store() );
+		Http_Mock::queue( Api_Test_Helpers::response( 401, '{"detail":"Unauthorized"}', array( 'x-oai-request-id' => 'req_8' ) ) );
+		try {
+			$this->send( $auth );
+			$this->fail( 'No exception' );
+		} catch ( RuntimeException $e ) {
+			$this->assertSame( 'ChatGPT: Unauthorized (request id req_8)', $e->getMessage() );
+		}
+		$this->assertCount( 1, Http_Mock::requests() );
+		$this->assertSame( array( 'refresh-1' ), $refresher->calls );
 	}
 
 	/**
@@ -291,7 +311,7 @@ class Test_Account_Authentication extends Test_Case {
 	public function test_force_refresh_skips_when_the_stored_token_already_changed() {
 		$store                    = Api_Test_Helpers::connected_store( array( 'access_token' => 'access-2' ) );
 		list( $auth, $refresher ) = $this->auth( $store );
-		$auth->force_refresh( 'access-1' );
+		$this->assertTrue( $auth->force_refresh( 'access-1' ) );
 		$this->assertSame( array(), $refresher->calls );
 	}
 
@@ -299,9 +319,33 @@ class Test_Account_Authentication extends Test_Case {
 	 * Force refresh refreshes when the token is unchanged.
 	 */
 	public function test_force_refresh_refreshes_when_the_token_is_unchanged() {
-		list( $auth, $refresher ) = $this->auth( Api_Test_Helpers::connected_store() );
-		$auth->force_refresh( 'access-1' );
+		$store                    = Api_Test_Helpers::connected_store();
+		list( $auth, $refresher ) = $this->auth( $store );
+		$refresher->on_refresh    = static function () use ( $store ) {
+			$store->update( array( 'access_token' => 'access-2' ) );
+		};
+		$this->assertTrue( $auth->force_refresh( 'access-1' ) );
 		$this->assertSame( array( 'refresh-1' ), $refresher->calls );
+		$this->assertSame( array( true ), $refresher->forced_calls );
+	}
+
+	/**
+	 * Force refresh reports false when the refresh leaves the same token.
+	 */
+	public function test_force_refresh_reports_false_when_the_token_is_unchanged() {
+		list( $auth ) = $this->auth( Api_Test_Helpers::connected_store() );
+		$this->assertFalse( $auth->force_refresh( 'access-1' ) );
+	}
+
+	/**
+	 * A timed-out lock wait during force refresh reports false instead of throwing.
+	 */
+	public function test_force_refresh_reports_false_after_a_lock_wait_timeout() {
+		list( $auth, $refresher ) = $this->auth( Api_Test_Helpers::connected_store() );
+		$refresher->on_refresh    = static function () {
+			throw new OAuthException( 'refresh_in_progress', 'ChatGPT tokens are being refreshed by another request. Try again in a moment.' );
+		};
+		$this->assertFalse( $auth->force_refresh( 'access-1' ) );
 	}
 
 	/**

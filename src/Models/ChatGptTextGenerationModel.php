@@ -129,8 +129,10 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 		$response = $this->getHttpTransporter()->send( $request );
 		$status   = $response->getStatusCode();
 
-		if ( 401 === $status && $allow_retry && $auth instanceof ChatGptAccountAuthentication ) {
-			$auth->force_refresh( (string) preg_replace( '/^Bearer\s+/i', '', (string) $request->getHeaderAsString( 'Authorization' ) ) );
+		// Retry once, and only when the refresh left a different token to send.
+		if ( 401 === $status && $allow_retry && $auth instanceof ChatGptAccountAuthentication
+			&& $auth->force_refresh( (string) preg_replace( '/^Bearer\s+/i', '', (string) $request->getHeaderAsString( 'Authorization' ) ) )
+		) {
 			return $this->sendWithRefreshRetry( $prompt, false );
 		}
 		if ( $status < 200 || $status >= 300 ) {

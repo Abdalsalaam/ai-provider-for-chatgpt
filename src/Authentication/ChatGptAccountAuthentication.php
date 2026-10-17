@@ -108,19 +108,29 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 	}
 
 	/**
-	 * Refreshes after a 401 unless another process already replaced the token.
+	 * Refreshes after a 401 and reports whether a different access token is stored.
+	 *
+	 * A refresh held by another request is waited for, so a 401 that coincides
+	 * with it still retries with the rotated token.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @param string $failed_access_token The access token the API rejected.
-	 * @return void
+	 * @return bool True when the stored access token now differs from the failed one.
+	 * @throws OAuthException When the refresh fails for a reason other than a lock wait.
 	 */
-	public function force_refresh( string $failed_access_token ): void {
-		$current = (string) $this->store->get_access_token();
-		if ( '' !== $current && ! hash_equals( $current, $failed_access_token ) ) {
-			return;
+	public function force_refresh( string $failed_access_token ): bool {
+		if ( $this->token_differs( $failed_access_token ) ) {
+			return true;
 		}
-		$this->refresher->refresh( $this->store->get_refresh_token() );
+		try {
+			$this->refresher->refresh( $this->store->get_refresh_token(), true );
+		} catch ( OAuthException $e ) {
+			if ( 'refresh_in_progress' !== $e->getErrorCode() ) {
+				throw $e;
+			}
+		}
+		return $this->token_differs( $failed_access_token );
 	}
 
 	/**
@@ -139,6 +149,17 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 			'properties'           => new \stdClass(),
 			'additionalProperties' => false,
 		);
+	}
+
+	/**
+	 * Whether the stored access token is set and differs from the given one.
+	 *
+	 * @param string $access_token The token to compare against.
+	 * @return bool
+	 */
+	private function token_differs( string $access_token ): bool {
+		$current = (string) $this->store->get_access_token();
+		return '' !== $current && ! hash_equals( $current, $access_token );
 	}
 
 	/**

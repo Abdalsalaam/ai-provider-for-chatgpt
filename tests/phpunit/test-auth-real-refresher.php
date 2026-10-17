@@ -8,6 +8,7 @@
 use Halawa\ChatGptAiProvider\Authentication\ChatGptAccountAuthentication;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\OAuth\OAuthException;
+use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Messages\DTO\UserMessage;
 
@@ -16,6 +17,7 @@ use const Halawa\ChatGptAiProvider\TOKEN_ENDPOINT;
 
 require_once __DIR__ . '/includes/class-api-test-helpers.php';
 require_once __DIR__ . '/includes/class-oauth-test-helpers.php';
+require_once __DIR__ . '/includes/class-api-test-pausing-refresher.php';
 
 /**
  * Pins the contract between stream A's refresher and stream B's authentication.
@@ -154,5 +156,55 @@ class Test_Auth_Real_Refresher extends Test_Case {
 		$this->assertSame( array( API_BASE_URL . '/responses', TOKEN_ENDPOINT, API_BASE_URL . '/responses' ), self::urls() );
 		$this->assertSame( 'Bearer access-1', Api_Test_Helpers::request_headers( $requests[0] )['authorization'] );
 		$this->assertSame( 'Bearer at_2', Api_Test_Helpers::request_headers( $requests[2] )['authorization'] );
+	}
+
+	/**
+	 * A 401 during another request's refresh waits for it and retries with its token.
+	 */
+	public function test_401_during_another_refresh_waits_and_retries_with_the_rotated_token() {
+		$store     = Api_Test_Helpers::connected_store();
+		$refresher = new Api_Test_Pausing_Refresher( $store );
+		add_option( TokenRefresher::LOCK_OPTION, (string) time(), '', false );
+		$refresher->on_pause = static function ( int $pauses ) use ( $store ) {
+			// The lock holder finishes its rotation during the second poll.
+			if ( 2 === $pauses ) {
+				$store->update(
+					array(
+						'access_token'  => 'at_other',
+						'refresh_token' => 'rt_other',
+					)
+				);
+			}
+		};
+		Http_Mock::queue( Http_Mock::json( array( 'detail' => 'Unauthorized' ), 401 ) );
+		$this->queue_stream();
+
+		Api_Test_Helpers::model( null, new ChatGptAccountAuthentication( $store, $refresher ) )
+			->generateTextResult( array( new UserMessage( array( new MessagePart( 'Hi' ) ) ) ) );
+
+		$requests = Http_Mock::requests();
+		$this->assertSame( array( API_BASE_URL . '/responses', API_BASE_URL . '/responses' ), self::urls() );
+		$this->assertSame( 'Bearer at_other', Api_Test_Helpers::request_headers( $requests[1] )['authorization'] );
+		$this->assertSame( 2, $refresher->pauses );
+	}
+
+	/**
+	 * A 401 during a refresh that never rotates raises the 401 after the wait, without a retry.
+	 */
+	public function test_401_during_a_stuck_refresh_raises_the_401_without_a_retry() {
+		$store     = Api_Test_Helpers::connected_store();
+		$refresher = new Api_Test_Pausing_Refresher( $store );
+		add_option( TokenRefresher::LOCK_OPTION, (string) time(), '', false );
+		Http_Mock::queue( Http_Mock::json( array( 'detail' => 'Unauthorized' ), 401, array( 'x-oai-request-id' => 'req_9' ) ) );
+
+		try {
+			Api_Test_Helpers::model( null, new ChatGptAccountAuthentication( $store, $refresher ) )
+				->generateTextResult( array( new UserMessage( array( new MessagePart( 'Hi' ) ) ) ) );
+			$this->fail( 'No exception' );
+		} catch ( RuntimeException $e ) {
+			$this->assertSame( 'ChatGPT: Unauthorized (request id req_9)', $e->getMessage() );
+		}
+		$this->assertSame( array( API_BASE_URL . '/responses' ), self::urls() );
+		$this->assertGreaterThan( 1, $refresher->pauses );
 	}
 }
