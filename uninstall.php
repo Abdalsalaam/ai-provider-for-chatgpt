@@ -92,7 +92,7 @@ if ( ! function_exists( 'halawa_chatgpt_uninstall' ) ) {
 			delete_option( $option );
 		}
 
-		// The plugin autoloader is not loaded during uninstall, so the hook name is literal.
+		// The hook name is literal so cleanup does not depend on the autoloader.
 		wp_clear_scheduled_hook( 'halawa_chatgpt_refresh_tokens' );
 
 		// Plugin transients (JWKS, pending sign-ins, 0.1.x pairing) and the SDK model cache.
