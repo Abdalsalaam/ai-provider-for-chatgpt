@@ -18,6 +18,11 @@
 	-->
 	<rule ref="WordPress.Files.FileName">
 		<exclude-pattern>src/</exclude-pattern>
+		<properties>
+			<property name="custom_test_classes" type="array">
+				<element value="Test_Case"/>
+			</property>
+		</properties>
 	</rule>
 
 	<!--

@@ -5,6 +5,7 @@
 	<file>src</file>
 	<file>ai-provider-for-chatgpt.php</file>
 	<file>uninstall.php</file>
+	<file>tests</file>
 
 	<!-- Exclude paths. The first pattern excludes any folder whose name starts with a dot
 	     (.git/, .github/, .phpstan/, .wp-env/, …) so dotfile dirs don't need to be listed. -->
@@ -13,6 +14,7 @@
 	<exclude-pattern>assets/</exclude-pattern>
 	<exclude-pattern>node_modules/</exclude-pattern>
 	<exclude-pattern>dist/</exclude-pattern>
+	<exclude-pattern>tests/phpunit/fixtures/</exclude-pattern>
 
 	<!-- Show progress + source codes; colors; PHP only. -->
 	<arg value="ps"/>
