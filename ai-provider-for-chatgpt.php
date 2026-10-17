@@ -2,10 +2,10 @@
 /**
  * Plugin Name: AI Provider for ChatGPT
  * Plugin URI: https://github.com/Abdalsalaam/ai-provider-for-chatgpt
- * Description: Registers OpenAI as a WordPress AI provider authenticated with a ChatGPT account (Free/Plus/Pro) instead of an API key. Usage is billed against the connected ChatGPT subscription.
+ * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9
  * Requires PHP: 7.4
- * Version: 0.1.4
+ * Version: 0.2.0
  * Author: Abdalsalaam Halawa
  * Author URI: https://halawa.io
  * License: GPL-2.0-or-later

@@ -4,39 +4,44 @@
 
 # AI Provider for ChatGPT
 
-A WordPress AI provider plugin that lets WP 7.0's built-in AI features call OpenAI using your **ChatGPT account** (Free / Plus / Pro) instead of an API key. Requests are routed through the same backend Codex CLI uses, so usage is billed against your existing ChatGPT subscription.
+A WordPress AI provider plugin that lets the WordPress AI Client call OpenAI models with your **ChatGPT plan** instead of an API key. You connect with OpenAI's [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source) flow for open-source apps; requests go to `https://api.openai.com/v1` and are billed to your ChatGPT Plus, Pro or Go plan.
 
-- **Requires:** WordPress 6.9+, PHP 7.4+ (with `ext-sodium` and `ext-openssl`), Node 18+ for the build / pairing CLI.
+- **Requires:** WordPress 6.9+, PHP 7.4+ (with `ext-sodium` and `ext-openssl`), a ChatGPT Plus, Pro or Go account. Node 18+ only to build the admin UI.
 - **License:** GPL-2.0-or-later.
 
 ---
 
 ## Why this exists
 
-The official [`ai-provider-for-openai`](https://github.com/WordPress/ai-provider-for-openai) plugin only accepts an API key, which is billed against a separate OpenAI API account — your ChatGPT Plus/Pro subscription does not count. This plugin routes requests through `chatgpt.com/backend-api/codex` using the same auth mechanism Codex CLI uses, so usage is charged against your ChatGPT plan.
+The official [`ai-provider-for-openai`](https://github.com/WordPress/ai-provider-for-openai) plugin only accepts an API key, which is billed to a separate OpenAI API account; your ChatGPT plan does not count. Sign in with ChatGPT lets an app use the plan of the person who signs in, so this plugin bills AI Client requests to that plan.
 
 ## How it works
 
 ```
-┌──────────────────────────┐   one-time, on any machine with a browser
-│  Pairing CLI             │   $ npx @abdalsalaam/chatgpt-wp-connect <site> <token>
-│  (or Codex CLI)          │   → PKCE flow on http://localhost:1455
-└──────────────┬───────────┘   → posts the OAuth bundle to your site
-               │
-               │ one-time pairing token (10 min TTL, single-use)
-               ▼
-┌──────────────────────────┐   stored AES-encrypted in wp_options
-│  WordPress plugin        │   - id_token, access_token, refresh_token, account_id
-│  Settings → ChatGPT      │   - refresh handled from the WP server (8-day window)
-│                          │   - API calls → chatgpt.com/backend-api/codex/responses
-└──────────────────────────┘
+Settings > ChatGPT (browser)         WordPress server                       OpenAI
+----------------------------         ----------------                       ------
+"Continue with ChatGPT"  --------->  start sign-in: state, nonce and PKCE
+                                     verifier kept for 10 minutes
+opens the authorize page  ---------------------------------------------->  auth.openai.com
+                                                                            (account, agent name,
+                                                                             consent)
+lands on http://127.0.0.1:1455/auth/callback?code=...  (a page that cannot load)
+admin pastes that address  ------->  check the address and state
+                                     exchange the code  -------------------> auth.openai.com
+                                     verify the ID token (JWKS)  <---------- auth.openai.com
+                                     require the plan scope, store tokens
+                                     encrypted
+AI Client request  --------------->  Bearer token, refresh when due  -----> api.openai.com/v1
+                                                                            /responses, /models
+weekly cron  --------------------->  refresh under a lock  ---------------> auth.openai.com
+"Disconnect"  -------------------->  revoke, then clear  -----------------> auth.openai.com
 ```
 
-The OAuth authorize step only works from `http://localhost:1455` because that's the only redirect URI in OpenAI's allowlist for the public Codex client. **Token refresh and API calls have no such restriction**, so once the bundle is paired, the WordPress server handles everything else on its own.
+On the first sign-in OpenAI registers the plugin as an agent named "AI Provider for ChatGPT" on your account and issues a client id for this site. The browser never sees a token: the pasted address only carries a one-time code that is useless without the PKCE verifier the server kept.
 
 ## Setup
 
-1. **Build the admin UI** (one-time, run inside the plugin directory):
+1. **Build the admin UI** (one time, inside the plugin directory):
 
     ```sh
     composer install
@@ -44,114 +49,101 @@ The OAuth authorize step only works from `http://localhost:1455` because that's 
     npm run build
     ```
 
-    This produces `build/index.js` + `build/index.asset.php` that the plugin enqueues on the settings screen. If the bundle is missing, an admin notice tells you to run the build.
+    This produces `build/index.js` and `build/index.asset.php`, which the settings screen loads. If the bundle is missing, an admin notice tells you to run the build.
 
 2. **Activate the plugin** in WordPress.
 
-3. **Connect.** Go to **Settings → ChatGPT** and click **Connect with ChatGPT**. The page shows a one-line command — run it on any machine that has a browser:
+3. **Connect.** Go to **Settings > ChatGPT** and click **Continue with ChatGPT**. Sign in and approve in the tab that opens. Your browser then lands on a page at `http://127.0.0.1:1455/auth/callback` that cannot load; that is expected. Copy the full address from the address bar, paste it on the settings screen and click **Connect**. The sign-in attempt is valid for 10 minutes.
 
-    ```sh
-    npx @abdalsalaam/chatgpt-wp-connect https://your-site.example <pairing-token>
-    ```
+4. The plugin now appears in the AI provider picker with the models your plan offers.
 
-    The CLI opens an OpenAI sign-in page in your default browser, runs the OAuth PKCE flow on `127.0.0.1:1455`, then posts the resulting bundle to a one-time pairing endpoint on your site. The WordPress tab connects automatically — no copy/paste of secrets.
+Accounts without plan usage (Free) are refused at sign-in with a message, and nothing is saved.
 
-    The companion CLI source lives at [`Abdalsalaam/chatgpt-wp-connect`](https://github.com/Abdalsalaam/chatgpt-wp-connect) and is published to npm as `@abdalsalaam/chatgpt-wp-connect`.
+### Upgrading from 0.1.x
 
-4. **(Advanced)** If you already use Codex CLI, expand **Advanced** on the settings page and paste or upload `~/.codex/auth.json` instead.
-
-5. The plugin now appears in the WP AI provider picker. Models exposed by the Codex backend for your plan show up automatically.
+0.2.0 removes the Codex-based connection. On the first admin page load after the update, the old connection is deleted and administrators see a notice to sign in again. The companion command line tool `@abdalsalaam/chatgpt-wp-connect` is no longer needed and is deprecated on npm.
 
 ## Configuration
 
-All of these are optional. Drop into `wp-config.php`:
+Optional, in `wp-config.php`:
 
 ```php
-// Override the OAuth client_id used for token refresh.
-// Defaults to the public Codex CLI client.
-define( 'CHATGPT_OAUTH_CLIENT_ID', 'app_EMoamEEZ73f0CkXaXp7hrann' );
+// Use a client id registered with OpenAI instead of registering this site as an agent.
+define( 'CHATGPT_OAUTH_CLIENT_ID', 'oaiapp_...' );
 ```
+
+When this constant is set, sign-in uses that client id and skips the agent name step.
 
 Filters:
 
 | Filter | Purpose | Default |
 | --- | --- | --- |
-| `ai_provider_chatgpt_codex_client_version` | Codex CLI version reported on every request — determines which model set the backend exposes. | `0.133.0` |
-| `ai_provider_chatgpt_bundled_models` | Fallback list of model IDs added on top of whatever `/models` returns. | GPT‑5 family + Codex Mini |
-| `ai_provider_chatgpt_pair_rate_limit` | Max public-endpoint pair-redeem attempts per IP per minute. | `10` |
+| `halawa_chatgpt_redirect_uri` | Redirect address sent with sign-in. Only change it for a client id registered with a different redirect. | `http://127.0.0.1:1455/auth/callback` |
+| `halawa_chatgpt_bundled_models` | Model ids listed when the model list request fails or returns no listed model. | `gpt-6-luna`, `gpt-5.6-terra`, `gpt-5.6-luna` |
 
-Action hooks:
+## REST routes
 
-| Action | Fires | Use case |
+Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options` capability and the REST nonce; there is no public route.
+
+| Route | Method | Purpose |
 | --- | --- | --- |
-| `ai_provider_chatgpt_paired` | After a successful CLI pairing redemption. | Audit logging, session invalidation, notifications. |
+| `/connection` | GET | Connection status |
+| `/connection` | DELETE | Revoke at OpenAI and disconnect |
+| `/connection/sign-in` | POST | Start a sign-in, returns the authorize URL |
+| `/connection/callback` | POST | Finish a sign-in with the pasted `callback_url` |
+| `/connection/refresh` | POST | Refresh the tokens now |
+| `/diagnostics` | GET | Provider and connection diagnostics |
+| `/diagnostics/remote-models` | GET | Probe `GET /v1/models` |
+| `/cache` | DELETE | Clear the cached model list |
 
 ## Security model
 
-**Token storage.** The OAuth bundle is encrypted at rest with `sodium_crypto_secretbox`, using a 32-byte key derived from your `AUTH_KEY` and `LOGGED_IN_KEY` salts. A SQL dump alone is insufficient to recover tokens. The plugin refuses to read or write tokens when those salts are missing, shorter than 32 chars, or still set to the wp-config placeholder.
-
-**Pairing endpoint.** The CLI-facing `POST /wp-json/ai-provider-for-chatgpt/v1/connection/pair` route is public by necessity (the CLI has no admin cookie), but is gated by:
-
-- A 256-bit single-use token issued via an admin-only endpoint, hashed (SHA-256) before storage.
-- 10-minute TTL.
-- Atomic single-use: redemption uses `delete_transient`'s atomic boolean return, so two concurrent redemptions cannot both win.
-- Issuing a new token revokes any prior outstanding token.
-- Per-IP rate limit on the public route (10/min by default, filter above).
-- Generic error responses — parser internals never leak to unauthenticated callers.
-
-**Token refresh.** Refresh happens server-side every 8 days (or reactively on a 401). The refresh token rotates on every exchange.
+- **Token storage.** The token record is encrypted at rest with `sodium_crypto_secretbox`, using a 32-byte key derived from your `AUTH_KEY` and `LOGGED_IN_KEY` salts, so a database dump alone does not reveal the tokens. The plugin refuses to read or write tokens when those salts are missing, shorter than 32 characters, or still set to the `wp-config.php` placeholder.
+- **Sign-in.** State, nonce and the PKCE verifier stay on the server, one pending sign-in per administrator, valid for 10 minutes and usable once. The pasted address must match the expected redirect exactly. The ID token is verified against OpenAI's published keys (signature, issuer, audience, expiry, nonce) before anything is saved.
+- **Refresh.** Tokens are refreshed when the access token is near expiry and once a week by cron, under a database lock so two requests never use the same refresh token. If OpenAI ends the session, the connection is marked as needing a new sign-in and no further requests are sent.
+- **Disconnect.** The refresh token is revoked at OpenAI before the local record is deleted.
+- **Requests.** Every `/responses` request is sent with `store: false`.
 
 ## Troubleshooting
 
-- **"Pairing token expired" / countdown reached 0:0.** The token is valid for 10 minutes. Click **Try again** to mint a new one. Only the most-recently issued token is valid.
-- **"Could not copy the command".** Browser blocked clipboard access (common on non-HTTPS admin URLs). Select the displayed command manually.
-- **HTTP 429 on `/connection/pair`.** Too many redemption attempts from one IP in the last minute. Wait, or raise the cap with the `ai_provider_chatgpt_pair_rate_limit` filter.
-- **Models list is empty / "registry check failed".** Open **Settings → ChatGPT → Diagnostics**, click **Probe Codex backend**. If the probe returns an HTTP 4xx, the stored access token is stale; click **Refresh tokens** or re-pair.
+- **The page after approving cannot load.** Expected: copy its address and paste it on the settings screen.
+- **"Paste the full address of the page you landed on."** The pasted text is not the `http://127.0.0.1:1455/auth/callback?...` address. Copy the whole address bar, not the ChatGPT page.
+- **The sign-in attempt expired, or "No sign-in in progress".** Each attempt is valid for 10 minutes and once. Click **Start again**.
+- **"Your ChatGPT account did not grant plan usage".** Plan usage needs ChatGPT Plus, Pro or Go.
+- **"ChatGPT session ended".** OpenAI ended the session (for example after you disconnected the app in ChatGPT). Sign in again under **Settings > ChatGPT**.
+- **Usage limit reached.** Review your usage at [chatgpt.com/settings/usage](https://chatgpt.com/settings/usage).
+- **The model picker shows only the fallback models.** The SDK caches the model list for 24 hours, so after a failed `/v1/models` request the fallback list can stay until the cache is cleared. Clear it under **Settings > ChatGPT**, **Developer tools** menu, **Clear cached model list**.
 - **Admin notice "the admin UI bundle is missing".** Run `npm install && npm run build` in the plugin directory.
-
-## Reference
-
-| Concern | This plugin |
-| --- | --- |
-| Auth | OAuth bundle obtained via the companion `@abdalsalaam/chatgpt-wp-connect` CLI (Codex-style PKCE flow), or pasted from Codex CLI's `~/.codex/auth.json`. |
-| Refresh | `POST auth.openai.com/oauth/token` (refresh_token grant) from the WP server, every 8 days. |
-| API base | `https://chatgpt.com/backend-api/codex` |
-| Headers | `Authorization: Bearer <access_token>` + `ChatGPT-Account-ID: <uuid>` (+ `X-OpenAI-Fedramp: true` when applicable). |
-| Billing | Your ChatGPT subscription. |
-| Data residency | Consumer ChatGPT — **no API DPA**. |
-
-## Disclosures
-
-- **Reused first-party client_id.** The OAuth consent screen will say "Codex CLI" because that is the OpenAI-owned app whose client_id is used. If OpenAI revokes or rotates that client, the plugin breaks the same day.
-- **No API DPA.** Prompts may be used by OpenAI for training unless the connected ChatGPT account has training opt-out enabled.
-- **Only Free / Plus / Pro tiers** are eligible. Business / Edu / Enterprise are not.
-- **Image generation is not supported** on the Codex backend; use the standard `ai-provider-for-openai` plugin with an API key if you need DALL·E or gpt-image.
-- Two long-lived refresh tokens (one on your laptop in `~/.codex/auth.json`, one on the WP server) coexist after import. Running `codex login` again on your laptop does not invalidate the WP-side token.
 
 ## Development
 
 ```sh
-composer install            # PHP deps + linters
-npm install                 # JS deps
+composer install            # PHP deps and linters
+npm install                 # JS deps, including wp-env
 npm start                   # watch-mode webpack build
-composer check-php          # PHPCS (PSR-12 + WP standards)
+npx wp-env start            # local WordPress with the plugin (Docker)
+composer test               # PHPUnit on wp-env
+composer check-php          # PHPCS (WordPress standards)
 composer check-security     # PHPCS security profile
-composer phpstan            # PHPStan level 2
+composer check-l18n         # PHPCS text domain and prefixes
+composer phpstan -- --memory-limit=2G
+npm run typecheck && npm run lint:js
 ```
 
 Source layout:
 
 ```
 src/
-├── Admin/              admin menu + asset enqueue
-├── Authentication/    OAuth bundle storage, pairing tokens, request signer
-├── Cache/              PSR-16 ↔ transient adapter
-├── Metadata/           Codex /models directory
-├── Models/             text-generation model targeting /responses
-├── OAuth/              JWT claims reader, refresh exchange
-├── Provider/           the AbstractApiProvider implementation
-└── Rest/               REST controllers for the React admin UI
-client/                React admin UI (built into build/)
+  Admin/           settings page, assets, upgrade routine and notice
+  Authentication/  encrypted token store, request authentication
+  Cache/           PSR-16 cache on transients for the SDK model list
+  Metadata/        /v1/models directory
+  Models/          text generation on /v1/responses, error messages
+  OAuth/           PKCE, callback URL, JWKS verifier, token endpoint, sign-in flow, refresher
+  Provider/        the AI Client provider
+  Rest/            REST controllers for the React admin UI
+client/            React admin UI (built into build/)
+tests/phpunit/     PHPUnit tests, HTTP mock and fixtures
 ```
 
 ## License
