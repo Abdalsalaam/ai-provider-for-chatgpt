@@ -12,14 +12,14 @@ namespace Halawa\ChatGptAiProvider\OAuth;
 /**
  * Random values and the S256 code challenge for the authorization request.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class Pkce {
 
 	/**
 	 * Returns a random base64url string without padding.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param int $bytes Number of random bytes.
 	 * @return string The encoded value.
@@ -31,7 +31,7 @@ final class Pkce {
 	/**
 	 * Returns the S256 challenge for a verifier.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $verifier The code verifier.
 	 * @return string The base64url SHA-256 digest.
@@ -43,7 +43,7 @@ final class Pkce {
 	/**
 	 * Encodes bytes as base64url without padding.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $bytes Raw bytes.
 	 * @return string The encoded value.

@@ -27,7 +27,7 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 	/**
 	 * Message when the stored record needs a new sign-in.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @var string
 	 */
@@ -36,7 +36,7 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 	/**
 	 * Message when no record is stored.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @var string
 	 */

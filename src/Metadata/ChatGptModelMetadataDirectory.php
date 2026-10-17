@@ -34,7 +34,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Models listed when a connected site cannot read /v1/models.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @var list<string>
 	 */
@@ -79,7 +79,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Keeps an account authentication and ignores the registry's API key placeholder.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param RequestAuthenticationInterface $request_authentication The authentication.
 	 * @return void
@@ -96,7 +96,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 * Authentication runs first and is not caught, so a site that is not
 	 * connected reports the provider as not configured.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return array<string, ModelMetadata> Models keyed by id.
 	 */
@@ -147,7 +147,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Normalises a /models body to one entry per model.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param mixed $data The decoded body.
 	 * @return list<array{id: string, name: string, listed: bool, image: bool}>
@@ -175,7 +175,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Returns the filtered fallback list as normalised entries.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return list<array{id: string, name: string, listed: bool, image: bool}>
 	 */
@@ -208,7 +208,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Builds model metadata from a normalised entry.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array{id: string, name: string, listed: bool, image: bool} $entry The entry.
 	 * @return ModelMetadata

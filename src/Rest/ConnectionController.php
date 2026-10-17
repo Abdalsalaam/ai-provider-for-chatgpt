@@ -184,7 +184,7 @@ class ConnectionController extends WP_REST_Controller {
 	/**
 	 * POST /connection/sign-in: starts a sign-in attempt.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -199,7 +199,7 @@ class ConnectionController extends WP_REST_Controller {
 	/**
 	 * POST /connection/callback: completes the sign-in from the pasted address.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return WP_REST_Response|WP_Error
@@ -265,7 +265,7 @@ class ConnectionController extends WP_REST_Controller {
 	/**
 	 * Maps an exception to a WP_Error.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param Throwable $e The exception.
 	 * @return WP_Error
@@ -293,7 +293,7 @@ class ConnectionController extends WP_REST_Controller {
 	/**
 	 * Clears the SDK model cache so the model list follows the connection.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */

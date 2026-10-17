@@ -17,7 +17,7 @@ use const Halawa\ChatGptAiProvider\JWKS_URI;
 /**
  * Verifies OpenAI ID tokens against the published JWKS.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class JwksVerifier {
 
@@ -33,7 +33,7 @@ final class JwksVerifier {
 	/**
 	 * Constructor.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string|null $jwks_uri JWKS location, defaults to OpenAI's.
 	 */
@@ -44,7 +44,7 @@ final class JwksVerifier {
 	/**
 	 * Verifies signature, issuer, audience, expiry and nonce.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $id_token           The JWT.
 	 * @param string $expected_client_id Client id that must be in aud.
@@ -92,7 +92,7 @@ final class JwksVerifier {
 	/**
 	 * Returns the PEM for a kid, refetching the JWKS once when the kid is unknown.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $kid Key id from the token header.
 	 * @return string PEM public key.
@@ -114,7 +114,7 @@ final class JwksVerifier {
 	/**
 	 * Fetches the JWKS and caches its keys for a day.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return array<int, mixed> The keys array.
 	 * @throws OAuthException When the response is not a usable JWKS.
@@ -144,7 +144,7 @@ final class JwksVerifier {
 	/**
 	 * Finds an RSA key by kid.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<int, mixed> $keys JWKS keys.
 	 * @param string            $kid  Key id.
@@ -166,7 +166,7 @@ final class JwksVerifier {
 	/**
 	 * Builds a SubjectPublicKeyInfo PEM from the JWK modulus and exponent.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $n Base64url modulus.
 	 * @param string $e Base64url exponent.
@@ -183,7 +183,7 @@ final class JwksVerifier {
 	/**
 	 * Encodes a DER INTEGER, adding a zero byte when the high bit is set.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $bytes Big-endian unsigned bytes.
 	 * @return string DER INTEGER.
@@ -199,7 +199,7 @@ final class JwksVerifier {
 	/**
 	 * Wraps content in a DER tag and length.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param int    $tag     DER tag.
 	 * @param string $content Encoded content.
@@ -217,7 +217,7 @@ final class JwksVerifier {
 	/**
 	 * Decodes a base64url segment.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $segment Encoded segment.
 	 * @return string|null Raw bytes, or null when invalid.
@@ -236,7 +236,7 @@ final class JwksVerifier {
 	/**
 	 * Builds the exception for a failed check.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $code Error code.
 	 * @return OAuthException The exception.

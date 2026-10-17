@@ -1,10 +1,10 @@
-# Manual steps for 0.2.0
+# Manual steps for 1.0.0
 
-## After 0.2.0 is released on WordPress.org
+## After 1.0.0 is released on WordPress.org
 
 Deprecate the companion command line tool on npm. This needs your npm login (`npm whoami` must print the package owner):
 
-    npm deprecate @abdalsalaam/chatgpt-wp-connect "No longer needed: AI Provider for ChatGPT 0.2.0 connects with Sign in with ChatGPT under Settings > ChatGPT."
+    npm deprecate @abdalsalaam/chatgpt-wp-connect "No longer needed: AI Provider for ChatGPT 1.0.0 connects with Sign in with ChatGPT under Settings > ChatGPT."
 
 Check it worked:
 

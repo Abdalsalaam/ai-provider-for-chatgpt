@@ -14,7 +14,7 @@ use const Halawa\ChatGptAiProvider\USAGE_URL;
 /**
  * Turns error responses from api.openai.com into one readable message.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class ResponsesError {
 
@@ -32,7 +32,7 @@ final class ResponsesError {
 	/**
 	 * Builds the message for an error response.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param int                   $status  HTTP status.
 	 * @param string                $body    Response body.
@@ -61,7 +61,7 @@ final class ResponsesError {
 	/**
 	 * Returns error.code from a JSON error body.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $body Response body.
 	 * @return string|null
@@ -78,7 +78,7 @@ final class ResponsesError {
 	/**
 	 * Flattens response headers to lower-case names and string values.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, string|list<string>> $headers Headers as the SDK or WordPress returns them.
 	 * @return array<string, string>
@@ -94,7 +94,7 @@ final class ResponsesError {
 	/**
 	 * Builds the message for an error object, from a body or a failed stream event.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, mixed> $error The error object.
 	 * @return string|null Null when the object carries neither code nor message.

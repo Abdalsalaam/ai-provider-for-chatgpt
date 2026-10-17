@@ -16,7 +16,7 @@ use const Halawa\ChatGptAiProvider\VERSION;
 /**
  * Migrates stored data once per plugin version and shows the reconnect notice.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class Upgrade {
 
@@ -34,7 +34,7 @@ final class Upgrade {
 	/**
 	 * Constructor.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param TokenStore|null $store Token store; a new one when null.
 	 */
@@ -45,7 +45,7 @@ final class Upgrade {
 	/**
 	 * Registers the admin hooks.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -58,7 +58,7 @@ final class Upgrade {
 	/**
 	 * Action callback for admin_init.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -69,7 +69,7 @@ final class Upgrade {
 	/**
 	 * Runs the migration when the stored version is older than this release.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool True when the migration ran.
 	 */
@@ -96,7 +96,7 @@ final class Upgrade {
 	/**
 	 * Prints the reconnect notice for administrators while the flag is set.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -123,7 +123,7 @@ final class Upgrade {
 	/**
 	 * Clears the notice flag and returns to the previous screen.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -141,7 +141,7 @@ final class Upgrade {
 	/**
 	 * Deletes every transient whose name starts with the prefix.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $prefix Transient name prefix.
 	 * @return void

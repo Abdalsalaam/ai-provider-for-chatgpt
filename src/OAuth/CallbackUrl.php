@@ -14,7 +14,7 @@ use InvalidArgumentException;
 /**
  * Parses the callback address the admin pastes after approving the sign-in.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class CallbackUrl {
 
@@ -27,7 +27,7 @@ final class CallbackUrl {
 	/**
 	 * Validates the address against the redirect URI and returns its parameters.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $url                   The pasted address.
 	 * @param string $expected_redirect_uri The redirect URI sent on authorize.
@@ -69,7 +69,7 @@ final class CallbackUrl {
 	/**
 	 * Compares scheme, host, port and path, and rejects userinfo.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, mixed> $actual   Parsed pasted address.
 	 * @param array<string, mixed> $expected Parsed redirect URI.
@@ -89,7 +89,7 @@ final class CallbackUrl {
 	/**
 	 * Returns the explicit port or the scheme default.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, mixed> $parts  Parsed URL.
 	 * @param string               $scheme Lower-case scheme.
@@ -105,7 +105,7 @@ final class CallbackUrl {
 	/**
 	 * Splits a query string, rejecting repeated keys.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $query Raw query string.
 	 * @return array<string, string> Decoded parameters.

@@ -78,7 +78,7 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	/**
 	 * Keeps an account authentication and ignores the registry's API key placeholder.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param RequestAuthenticationInterface $request_authentication The authentication.
 	 * @return void
@@ -200,7 +200,7 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	/**
 	 * Splits an SSE body into event names and decoded data.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $body The SSE body.
 	 * @return list<array{0: string, 1: array<string, mixed>}> Name and data per event.
@@ -234,7 +234,7 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	/**
 	 * Builds one model candidate from the output items, in stream order.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<int, mixed> $items  Output items.
 	 * @param string            $status Response status.
@@ -290,7 +290,7 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	/**
 	 * Builds a function call part from a `function_call` output item.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, mixed> $item  The output item.
 	 * @param int                  $index Its position in the output.
@@ -317,7 +317,7 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	/**
 	 * Builds the message for a failed response or an error event.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, mixed> $data Event data.
 	 * @return string

@@ -26,7 +26,7 @@ use const Halawa\ChatGptAiProvider\SCOPES;
 /**
  * Starts and completes Sign in with ChatGPT around a pending transient.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class SignInFlow {
 
@@ -57,7 +57,7 @@ final class SignInFlow {
 	/**
 	 * Constructor.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param TokenStore         $store    Token storage.
 	 * @param TokenEndpoint|null $endpoint Token endpoint client.
@@ -72,7 +72,7 @@ final class SignInFlow {
 	/**
 	 * Returns the pending transient key for a user.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param int $user_id User id.
 	 * @return string Transient key.
@@ -84,7 +84,7 @@ final class SignInFlow {
 	/**
 	 * Creates a pending attempt and returns the authorize URL.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param int $user_id Current user id.
 	 * @return array{authorize_url:string, redirect_uri:string, expires_at:int}
@@ -139,7 +139,7 @@ final class SignInFlow {
 	/**
 	 * Validates the pasted callback, exchanges the code and saves the record.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param int    $user_id      Current user id.
 	 * @param string $callback_url Pasted callback address.
@@ -224,7 +224,7 @@ final class SignInFlow {
 	/**
 	 * Returns the client id to exchange with, checking the callback value.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string      $pending_client_id Client id sent on authorize.
 	 * @param string|null $callback_client_id Client id in the callback.

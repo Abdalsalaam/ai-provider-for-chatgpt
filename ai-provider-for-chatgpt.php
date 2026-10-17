@@ -5,7 +5,7 @@
  * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9
  * Requires PHP: 7.4
- * Version: 0.2.0
+ * Version: 1.0.0
  * Author: Abdalsalaam Halawa
  * Author URI: https://halawa.io
  * License: GPL-2.0-or-later
@@ -41,14 +41,14 @@ require_once __DIR__ . '/vendor/autoload.php';
 /**
  * Plugin version, also used in the User-Agent header.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
-const VERSION = '0.2.0';
+const VERSION = '1.0.0';
 
 /**
  * Sign in with ChatGPT endpoints and identifiers (OpenAI open-source app flow).
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 const AUTHORIZE_ENDPOINT   = 'https://auth.openai.com/api/accounts/authorize';
 const TOKEN_ENDPOINT       = 'https://auth.openai.com/api/accounts/oauth/token';
@@ -67,7 +67,7 @@ const USAGE_URL            = 'https://chatgpt.com/settings/usage';
 /**
  * Returns the redirect URI sent on authorize and code exchange.
  *
- * @since 0.2.0
+ * @since 1.0.0
  *
  * @return string The redirect URI.
  */
@@ -75,7 +75,7 @@ function redirect_uri(): string {
 	/**
 	 * Filters the OAuth redirect URI, for a registered https client.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $uri Default loopback redirect URI.
 	 */
@@ -86,7 +86,7 @@ function redirect_uri(): string {
 /**
  * Returns the client id from the CHATGPT_OAUTH_CLIENT_ID constant, if set.
  *
- * @since 0.2.0
+ * @since 1.0.0
  *
  * @return string|null The configured client id, or null.
  */
@@ -101,7 +101,7 @@ function configured_client_id(): ?string {
 /**
  * Returns the stable ext_agent_host_id for this site.
  *
- * @since 0.2.0
+ * @since 1.0.0
  *
  * @return string The host id, "urn:uuid:" plus the installation uuid.
  */
@@ -118,7 +118,7 @@ function host_id(): string {
 /**
  * Returns the User-Agent sent to OpenAI.
  *
- * @since 0.2.0
+ * @since 1.0.0
  *
  * @return string The User-Agent header value.
  */
@@ -202,7 +202,7 @@ add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' 
 /**
  * Schedules the weekly refresh when a live connection already exists.
  *
- * @since 0.2.0
+ * @since 1.0.0
  *
  * @return void
  */
@@ -216,7 +216,7 @@ function activate(): void {
 /**
  * Removes the weekly refresh; the connection itself is kept.
  *
- * @since 0.2.0
+ * @since 1.0.0
  *
  * @return void
  */

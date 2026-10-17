@@ -18,14 +18,14 @@ use const Halawa\ChatGptAiProvider\TOKEN_ENDPOINT;
 /**
  * Form-encoded calls to the OpenAI token and revoke endpoints.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class TokenEndpoint {
 
 	/**
 	 * Exchanges an authorization code for tokens.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $client_id     Issued client id.
 	 * @param string $code          Authorization code.
@@ -50,7 +50,7 @@ final class TokenEndpoint {
 	/**
 	 * Exchanges a refresh token for a rotated token set.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $client_id     Issued client id.
 	 * @param string $refresh_token Current refresh token.
@@ -71,7 +71,7 @@ final class TokenEndpoint {
 	/**
 	 * Revokes a refresh token; true only on HTTP 200.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $client_id     Issued client id.
 	 * @param string $refresh_token Refresh token to revoke.
@@ -92,7 +92,7 @@ final class TokenEndpoint {
 	/**
 	 * Posts to the token endpoint and returns the typed token set.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, string> $fields Form fields.
 	 * @return array{access_token:string, refresh_token:string, id_token:string, expires_in:int, scope:string, earliest_refresh_at:?int, token_type:string}
@@ -138,7 +138,7 @@ final class TokenEndpoint {
 	/**
 	 * Extracts the error code and message from an error body.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param mixed $data   Decoded body.
 	 * @param int   $status HTTP status.
@@ -169,7 +169,7 @@ final class TokenEndpoint {
 	/**
 	 * Sends a form-encoded POST.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string                $url    Endpoint.
 	 * @param array<string, string> $fields Form fields.

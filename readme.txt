@@ -3,7 +3,7 @@ Contributors: abdalsalaam
 Tags: ai, chatgpt, openai, ai-provider, chatbot
 Requires at least: 6.9
 Tested up to: 7.1
-Stable tag: 0.2.0
+Stable tag: 1.0.0
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -64,7 +64,7 @@ In your ChatGPT settings at [https://chatgpt.com/settings/usage](https://chatgpt
 
 = I used version 0.1.x. What changes? =
 
-Version 0.2.0 connects with Sign in with ChatGPT and no longer uses the command line tool or `auth.json` files. Existing connections are removed on update; sign in again under **Settings > ChatGPT**. Free accounts are no longer eligible.
+Version 1.0.0 connects with Sign in with ChatGPT and no longer uses the command line tool or `auth.json` files. Existing connections are removed on update; sign in again under **Settings > ChatGPT**. Free accounts are no longer eligible.
 
 = Does this plugin work without the WordPress AI Client? =
 
@@ -102,7 +102,7 @@ These services are provided by OpenAI. By connecting an account and using this p
 
 == Changelog ==
 
-= 0.2.0 =
+= 1.0.0 =
 
 * Connect with Sign in with ChatGPT: click Continue with ChatGPT, approve, and paste the address you land on. No command line tool and no file to copy.
 * Requests go to api.openai.com with the client id OpenAI issues to this site at sign-in, billed to your ChatGPT Plus, Pro or Go plan.
@@ -142,7 +142,7 @@ These services are provided by OpenAI. By connecting an account and using this p
 
 == Upgrade Notice ==
 
-= 0.2.0 =
+= 1.0.0 =
 Connects with Sign in with ChatGPT. Existing connections must sign in again, and a ChatGPT Plus, Pro or Go plan is required.
 
 = 0.1.4 =

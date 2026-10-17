@@ -67,7 +67,7 @@ class TokenStore {
 	/**
 	 * Returns true when the option holds something that is not a v2 record.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool True for a legacy or unreadable record.
 	 */
@@ -96,7 +96,7 @@ class TokenStore {
 	/**
 	 * Merges fields into the stored record and saves it.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, mixed> $fields Fields to replace.
 	 * @return void
@@ -112,7 +112,7 @@ class TokenStore {
 	/**
 	 * Marks the record as needing a new sign-in, keeping identity fields.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -164,7 +164,7 @@ class TokenStore {
 	/**
 	 * Returns the ID token.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string|null The token.
 	 */
@@ -175,7 +175,7 @@ class TokenStore {
 	/**
 	 * Returns the issued client id.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string|null The client id.
 	 */
@@ -186,7 +186,7 @@ class TokenStore {
 	/**
 	 * Returns the ChatGPT account subject.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string|null The sub claim.
 	 */
@@ -197,7 +197,7 @@ class TokenStore {
 	/**
 	 * Returns the account email.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string|null The email.
 	 */
@@ -208,7 +208,7 @@ class TokenStore {
 	/**
 	 * Returns the account display name.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string|null The name.
 	 */
@@ -219,7 +219,7 @@ class TokenStore {
 	/**
 	 * Returns the ext_agent_host_id used at sign-in.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string|null The host id.
 	 */
@@ -230,7 +230,7 @@ class TokenStore {
 	/**
 	 * Returns the granted scopes.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return list<string> The scopes.
 	 */
@@ -242,7 +242,7 @@ class TokenStore {
 	/**
 	 * Returns the access token expiry, 0 when unknown.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return int UNIX timestamp.
 	 */
@@ -253,7 +253,7 @@ class TokenStore {
 	/**
 	 * Returns the advisory earliest refresh time, 0 when unknown.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return int UNIX timestamp.
 	 */
@@ -264,7 +264,7 @@ class TokenStore {
 	/**
 	 * Returns true when the record must be renewed by a new sign-in.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool True when marked.
 	 */
@@ -275,7 +275,7 @@ class TokenStore {
 	/**
 	 * Returns true when the plan usage scope was granted.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool True when granted.
 	 */
@@ -299,7 +299,7 @@ class TokenStore {
 	/**
 	 * Decrypts the option into an array, whatever its shape.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return array<string, mixed>|null The decoded payload, or null.
 	 */
@@ -325,7 +325,7 @@ class TokenStore {
 	/**
 	 * Encrypts and stores a record as is.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param array<string, mixed> $record The record.
 	 * @return void
@@ -340,7 +340,7 @@ class TokenStore {
 	/**
 	 * Returns a non-empty string field of the record.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $key Field name.
 	 * @return string|null The value, or null.
@@ -353,7 +353,7 @@ class TokenStore {
 	/**
 	 * Returns an integer field of the record, 0 when missing.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string $key Field name.
 	 * @return int The value.

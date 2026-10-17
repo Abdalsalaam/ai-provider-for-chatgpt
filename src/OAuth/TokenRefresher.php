@@ -82,7 +82,7 @@ class TokenRefresher {
 	/**
 	 * Returns true when the access token has expired.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool True when expired.
 	 */
@@ -161,7 +161,7 @@ class TokenRefresher {
 	/**
 	 * Schedules the weekly refresh when it is not scheduled.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -174,7 +174,7 @@ class TokenRefresher {
 	/**
 	 * Removes the weekly refresh.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -185,7 +185,7 @@ class TokenRefresher {
 	/**
 	 * Cron callback: refreshes a live record so the refresh token stays valid.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */
@@ -207,7 +207,7 @@ class TokenRefresher {
 	/**
 	 * Inserts the lock row; one affected row means this process holds it.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool True when the lock was acquired.
 	 */
@@ -242,7 +242,7 @@ class TokenRefresher {
 	/**
 	 * Waits for the lock holder when the current access token is expired or rejected.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param bool $treat_as_expired True when the API rejected a token the clock still accepts.
 	 * @return string BUSY when the token is still valid, ALREADY_ROTATED after the wait.
@@ -270,7 +270,7 @@ class TokenRefresher {
 	/**
 	 * Sleeps between lock polls; tests override it to simulate the other process.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param int $milliseconds Pause length.
 	 * @return void
@@ -282,7 +282,7 @@ class TokenRefresher {
 	/**
 	 * Returns true while a lock row exists.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return bool True when locked.
 	 */
@@ -295,7 +295,7 @@ class TokenRefresher {
 	/**
 	 * Deletes the lock row.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return void
 	 */

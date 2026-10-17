@@ -77,7 +77,7 @@ class Test_Config extends Test_Case {
 	 * The user agent names only the plugin and WordPress.
 	 */
 	public function test_user_agent() {
-		$this->assertSame( 'ai-provider-for-chatgpt/0.2.0 (WordPress/' . get_bloginfo( 'version' ) . ')', user_agent() );
+		$this->assertSame( 'ai-provider-for-chatgpt/1.0.0 (WordPress/' . get_bloginfo( 'version' ) . ')', user_agent() );
 	}
 
 	/**

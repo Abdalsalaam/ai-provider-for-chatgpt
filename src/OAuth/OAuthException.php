@@ -12,7 +12,7 @@ namespace Halawa\ChatGptAiProvider\OAuth;
 /**
  * Sign-in, token or verification failure with a machine-readable code.
  *
- * @since 0.2.0
+ * @since 1.0.0
  */
 final class OAuthException extends \RuntimeException {
 
@@ -40,7 +40,7 @@ final class OAuthException extends \RuntimeException {
 	/**
 	 * Constructor.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param string      $code        OpenAI error value or a local code.
 	 * @param string      $message     Message safe to show an admin.
@@ -57,7 +57,7 @@ final class OAuthException extends \RuntimeException {
 	/**
 	 * Returns the machine-readable error code.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string The code.
 	 */
@@ -68,7 +68,7 @@ final class OAuthException extends \RuntimeException {
 	/**
 	 * Returns the HTTP status, 0 when the failure was not an HTTP response.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return int The status.
 	 */
@@ -79,7 +79,7 @@ final class OAuthException extends \RuntimeException {
 	/**
 	 * Returns the OpenAI request id, when present.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return string|null The request id.
 	 */
