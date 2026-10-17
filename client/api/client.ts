@@ -48,6 +48,14 @@ export const api = {
 		} );
 	},
 
+	// Signs out and removes the registration so another account can sign in.
+	forgetAccount(): Promise< DisconnectResult > {
+		return apiFetch< DisconnectResult >( {
+			path: `/${ NS }/connection?forget=true`,
+			method: 'DELETE',
+		} );
+	},
+
 	refresh(): Promise< RefreshResult > {
 		return apiFetch< RefreshResult >( {
 			path: `/${ NS }/connection/refresh`,

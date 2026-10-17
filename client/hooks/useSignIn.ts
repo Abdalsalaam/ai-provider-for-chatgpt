@@ -34,6 +34,7 @@ export type SignInState = {
 	begin: () => Promise< void >;
 	submit: ( callbackUrl: string ) => Promise< void >;
 	clearError: () => void;
+	reset: () => void;
 };
 
 // Local deadline from the server expiry, bounded so a skewed clock cannot break it.
@@ -116,6 +117,13 @@ export function useSignIn(
 
 	const clearError = useCallback( () => setError( null ), [] );
 
+	// Drops the current attempt, for example after the server forgot it.
+	const reset = useCallback( () => {
+		setStart( null );
+		setError( null );
+		setNeedsRestart( false );
+	}, [] );
+
 	return {
 		start,
 		starting,
@@ -127,5 +135,6 @@ export function useSignIn(
 		begin,
 		submit,
 		clearError,
+		reset,
 	};
 }

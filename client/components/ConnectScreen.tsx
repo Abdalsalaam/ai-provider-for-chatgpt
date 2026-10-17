@@ -6,6 +6,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { EMPTY_FIELD, useSignIn } from '../hooks/useSignIn';
 import { formatClock } from '../utils';
 import { ChatGptIcon } from './ChatGptIcon';
+import { ForgetAccountModal } from './ForgetAccountModal';
 import type { ConnectionStatus, SignInStart } from '../types';
 
 const ELIGIBILITY_URL =
@@ -27,6 +28,18 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 	const signIn = useSignIn( onConnected );
 	const [ callbackUrl, setCallbackUrl ] = useState( '' );
 	const [ clipboardFailed, setClipboardFailed ] = useState( false );
+	const [ confirmForget, setConfirmForget ] = useState( false );
+
+	// A signed-out site keeps its registration and account until it is forgotten.
+	const canForget = ! status.connected && status.client_id !== null;
+	const rememberedAccount = canForget ? status.email ?? status.name : null;
+
+	const onForgotten = ( next: ConnectionStatus ) => {
+		setConfirmForget( false );
+		setCallbackUrl( '' );
+		signIn.reset();
+		onConnected( next );
+	};
 
 	const restart = () => {
 		setCallbackUrl( '' );
@@ -115,6 +128,19 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 							</Notice.ActionLink>
 						</Notice.Actions>
 					) }
+					{ signIn.error?.code === 'account_mismatch' &&
+						canForget && (
+							<Notice.Actions>
+								<Notice.ActionButton
+									onClick={ () => setConfirmForget( true ) }
+								>
+									{ __(
+										'Use a different ChatGPT account',
+										'ai-provider-for-chatgpt'
+									) }
+								</Notice.ActionButton>
+							</Notice.Actions>
+						) }
 					<Notice.CloseIcon onClick={ signIn.clearError } />
 				</Notice.Root>
 			) }
@@ -154,6 +180,33 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 					) }
 				</figcaption>
 			</figure>
+
+			{ ! signIn.start && canForget && (
+				<p className="ai-provider-for-chatgpt-actions-row">
+					{ rememberedAccount && (
+						<span>
+							{ sprintf(
+								/* translators: %s: email, or name, of the ChatGPT account this site remembers. */
+								__(
+									'Sign in again as %s',
+									'ai-provider-for-chatgpt'
+								),
+								rememberedAccount
+							) }
+						</span>
+					) }
+					<Button
+						variant="minimal"
+						size="small"
+						onClick={ () => setConfirmForget( true ) }
+					>
+						{ __(
+							'Use a different ChatGPT account',
+							'ai-provider-for-chatgpt'
+						) }
+					</Button>
+				</p>
+			) }
 
 			{ ! signIn.start && (
 				<p className="ai-provider-for-chatgpt-actions-row">
@@ -282,6 +335,12 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 							  ) }
 					</p>
 				</div>
+			) }
+			{ confirmForget && canForget && (
+				<ForgetAccountModal
+					onClose={ () => setConfirmForget( false ) }
+					onForgotten={ onForgotten }
+				/>
 			) }
 		</div>
 	);
