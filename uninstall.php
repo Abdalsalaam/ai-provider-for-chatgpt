@@ -57,7 +57,8 @@ function halawa_chatgpt_uninstall_cleanup_site(): void {
 			$wpdb->esc_like( '_transient_timeout_ai_client_' ) . '%'
 		)
 	);
-	if ( wp_using_ext_object_cache() ) {
+	// Some persistent object caches cannot flush a single group.
+	if ( wp_using_ext_object_cache() && wp_cache_supports( 'flush_group' ) ) {
 		wp_cache_flush_group( 'transient' );
 	}
 }
