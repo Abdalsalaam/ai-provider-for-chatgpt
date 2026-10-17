@@ -6,6 +6,7 @@
  */
 
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
+use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 
 require_once __DIR__ . '/includes/class-oauth-test-helpers.php';
 
@@ -169,5 +170,83 @@ class Test_Token_Store extends Test_Case {
 		$this->assertFalse( get_option( TokenStore::OPTION_NAME ) );
 		$this->assertSame( 'absent', get_option( TokenStore::CORE_API_KEY_OPTION, 'absent' ) );
 		$this->assertNull( $store->get() );
+	}
+
+	/**
+	 * Sign-out keeps only the registration fields.
+	 */
+	public function test_sign_out_keeps_registration_only() {
+		$store  = new TokenStore();
+		$record = OAuth_Test_Helpers::record( array( 'needs_signin' => true ) );
+		$store->save( $record );
+
+		$store->sign_out();
+
+		$remnant = $store->get();
+		$this->assertSame(
+			array( 'client_id', 'email', 'ext_agent_host_id', 'name', 'needs_signin', 'subject', 'version' ),
+			$this->sorted_keys( $remnant )
+		);
+		$this->assertSame( 'oaiapp_x', $remnant['client_id'] );
+		$this->assertSame( $record['ext_agent_host_id'], $remnant['ext_agent_host_id'] );
+		$this->assertFalse( $store->needs_signin() );
+		$this->assertSame( array(), $store->get_scopes() );
+		$this->assertSame( 0, $store->get_expires_at() );
+		$this->assertSame( 'absent', get_option( TokenStore::CORE_API_KEY_OPTION, 'absent' ) );
+	}
+
+	/**
+	 * A signed-out registration is neither connected nor legacy, and keeps no cron.
+	 */
+	public function test_remnant_is_not_connected_or_legacy() {
+		$store = new TokenStore();
+		$store->save( OAuth_Test_Helpers::record() );
+		$this->assertTrue( $store->is_connected() );
+		$this->assertIsInt( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
+
+		$store->sign_out();
+
+		$this->assertFalse( $store->is_connected() );
+		$this->assertTrue( $store->has_registration() );
+		$this->assertFalse( $store->has_legacy_record() );
+		$this->assertFalse( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
+	}
+
+	/**
+	 * Connected needs both tokens and no pending new sign-in.
+	 */
+	public function test_is_connected_cases() {
+		$store = new TokenStore();
+		$this->assertFalse( $store->is_connected() );
+		$this->assertFalse( $store->has_registration() );
+
+		$store->save( OAuth_Test_Helpers::record( array( 'needs_signin' => true ) ) );
+		$this->assertFalse( $store->is_connected() );
+
+		$store->save( OAuth_Test_Helpers::record( array( 'refresh_token' => '' ) ) );
+		$this->assertFalse( $store->is_connected() );
+
+		$store->save( OAuth_Test_Helpers::record() );
+		$this->assertTrue( $store->is_connected() );
+	}
+
+	/**
+	 * Sign-out without a record does nothing.
+	 */
+	public function test_sign_out_without_record() {
+		( new TokenStore() )->sign_out();
+		$this->assertFalse( get_option( TokenStore::OPTION_NAME ) );
+	}
+
+	/**
+	 * Returns the sorted keys of an array.
+	 *
+	 * @param array $data Data.
+	 * @return array
+	 */
+	private function sorted_keys( array $data ) {
+		$keys = array_keys( $data );
+		sort( $keys );
+		return $keys;
 	}
 }

@@ -359,4 +359,32 @@ class Test_Account_Authentication extends Test_Case {
 		$model->generateTextResult( array( new UserMessage( array( new MessagePart( 'Hi' ) ) ) ) );
 		$this->assertSame( 'Bearer access-1', Api_Test_Helpers::request_headers( Api_Test_Helpers::last_request() )['authorization'] );
 	}
+
+	/**
+	 * A signed-out registration throws not connected without refresh or request.
+	 */
+	public function test_signed_out_registration_throws_not_connected_without_refresh() {
+		$store = new TokenStore();
+		$store->save(
+			array(
+				'client_id'     => 'oaiapp_test',
+				'subject'       => 'user_test',
+				'access_token'  => 'fake-access',
+				'refresh_token' => 'fake-refresh',
+				'id_token'      => 'fake.id.token',
+				'expires_at'    => time() + 3600,
+			)
+		);
+		$store->sign_out();
+		list( $auth, $refresher ) = $this->auth( $store );
+		$refresher->due = true;
+		try {
+			$this->send( $auth );
+			$this->fail( 'No exception' );
+		} catch ( RuntimeException $e ) {
+			$this->assertSame( ChatGptAccountAuthentication::NOT_CONNECTED, $e->getMessage() );
+		}
+		$this->assertSame( array(), Http_Mock::requests() );
+		$this->assertSame( array(), $refresher->calls );
+	}
 }

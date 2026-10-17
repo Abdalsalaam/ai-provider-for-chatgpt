@@ -166,6 +166,10 @@ class TokenRefresher {
 	 * @return void
 	 */
 	public static function schedule(): void {
+		// A signed-out registration has nothing to keep alive.
+		if ( ! ( new TokenStore() )->is_connected() ) {
+			return;
+		}
 		if ( false === wp_next_scheduled( self::CRON_HOOK ) ) {
 			wp_schedule_event( time() + self::CRON_INTERVAL_OFFSET, self::CRON_RECURRENCE, self::CRON_HOOK );
 		}
@@ -191,7 +195,7 @@ class TokenRefresher {
 	 */
 	public static function run_cron(): void {
 		$store = new TokenStore();
-		if ( null === $store->get() || $store->needs_signin() ) {
+		if ( ! $store->is_connected() ) {
 			return;
 		}
 		try {
