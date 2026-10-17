@@ -45,7 +45,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 *
 	 * The ai_client_ prefix makes the plugin's cache clears remove it too.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @var string
 	 */
@@ -155,7 +155,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Returns the cached listed entries, or null when there are none.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @return list<array{id: string, name: string, listed: bool, image: bool}>|null
 	 */
@@ -178,7 +178,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Builds model metadata keyed by id from normalised entries.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param list<array{id: string, name: string, listed: bool, image: bool}> $entries The entries.
 	 * @return array<string, ModelMetadata>
@@ -206,7 +206,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	/**
 	 * Returns the listed entries of a /models body, in server order.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
 	 * @param mixed $data The decoded body.
 	 * @return list<array{id: string, name: string, listed: bool, image: bool}>
