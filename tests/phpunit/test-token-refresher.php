@@ -367,6 +367,22 @@ class Test_Token_Refresher extends Test_Case {
 	}
 
 	/**
+	 * A record without a refresh token is not_connected after the lock.
+	 */
+	public function test_record_without_refresh_token_is_not_connected() {
+		$this->store->save( OAuth_Test_Helpers::record( array( 'refresh_token' => '' ) ) );
+		$this->assertNotNull( $this->store->get() );
+		try {
+			( new TokenRefresher( $this->store ) )->refresh();
+			$this->fail( 'Expected not_connected' );
+		} catch ( OAuthException $e ) {
+			$this->assertSame( 'not_connected', $e->getErrorCode() );
+		}
+		$this->assertCount( 0, Http_Mock::requests() );
+		$this->assertNull( $this->lock_value() );
+	}
+
+	/**
 	 * Saving schedules the weekly event once; clearing removes it.
 	 */
 	public function test_cron_follows_the_record() {
