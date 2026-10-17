@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Halawa\ChatGptAiProvider\Authentication;
 
 use WordPress\AiClient\Common\Exception\RuntimeException;
+use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 
 use const Halawa\ChatGptAiProvider\PLAN_SCOPE;
 
@@ -89,6 +90,7 @@ class TokenStore {
 		$this->write( $record );
 		// Flag the connector as configured for WP core's Settings > Connectors UI.
 		update_option( self::CORE_API_KEY_OPTION, self::CORE_API_KEY_PLACEHOLDER, false );
+		TokenRefresher::schedule();
 	}
 
 	/**
@@ -121,6 +123,7 @@ class TokenStore {
 		}
 		$record['needs_signin'] = true;
 		$this->write( $record );
+		TokenRefresher::unschedule();
 	}
 
 	/**
@@ -133,6 +136,7 @@ class TokenStore {
 	public function clear(): void {
 		delete_option( self::OPTION_NAME );
 		delete_option( self::CORE_API_KEY_OPTION );
+		TokenRefresher::unschedule();
 	}
 
 	/**
