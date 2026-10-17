@@ -139,4 +139,40 @@ class Test_Responses_Error extends Test_Case {
 			)
 		);
 	}
+
+	/**
+	 * Rejects param recognises an unsupported_capability param and a detail naming it.
+	 */
+	public function test_rejects_param_reads_both_body_shapes() {
+		$capability = wp_json_encode(
+			array(
+				'error' => array(
+					'code'  => 'subscription_sharing_unsupported_capability',
+					'param' => 'max_output_tokens',
+				),
+			)
+		);
+		$other      = wp_json_encode(
+			array(
+				'error' => array(
+					'code'  => 'subscription_sharing_unsupported_capability',
+					'param' => 'tools[0].type',
+				),
+			)
+		);
+		$other_code = wp_json_encode(
+			array(
+				'error' => array(
+					'code'  => 'invalid_value',
+					'param' => 'max_output_tokens',
+				),
+			)
+		);
+		$this->assertTrue( ResponsesError::rejects_param( (string) $capability, 'max_output_tokens' ) );
+		$this->assertTrue( ResponsesError::rejects_param( '{"detail":"Unsupported parameter: max_output_tokens"}', 'max_output_tokens' ) );
+		$this->assertFalse( ResponsesError::rejects_param( (string) $other, 'max_output_tokens' ) );
+		$this->assertFalse( ResponsesError::rejects_param( (string) $other_code, 'max_output_tokens' ) );
+		$this->assertFalse( ResponsesError::rejects_param( '{"detail":"System messages are not allowed"}', 'max_output_tokens' ) );
+		$this->assertFalse( ResponsesError::rejects_param( '<html>max_output_tokens</html>', 'max_output_tokens' ) );
+	}
 }

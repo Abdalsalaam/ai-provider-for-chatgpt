@@ -76,6 +76,27 @@ final class ResponsesError {
 	}
 
 	/**
+	 * Whether an error body says the route does not support the given parameter.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $body  Response body.
+	 * @param string $param Request parameter name, for example max_output_tokens.
+	 * @return bool True for an unsupported_capability error on $param, or a detail naming it.
+	 */
+	public static function rejects_param( string $body, string $param ): bool {
+		$decoded = json_decode( $body, true );
+		if ( ! is_array( $decoded ) ) {
+			return false;
+		}
+		if ( isset( $decoded['detail'] ) && is_string( $decoded['detail'] ) ) {
+			return false !== strpos( $decoded['detail'], $param );
+		}
+		$error = isset( $decoded['error'] ) && is_array( $decoded['error'] ) ? $decoded['error'] : array();
+		return 'subscription_sharing_unsupported_capability' === ( $error['code'] ?? null ) && isset( $error['param'] ) && $error['param'] === $param;
+	}
+
+	/**
 	 * Flattens response headers to lower-case names and string values.
 	 *
 	 * @since 1.0.0
