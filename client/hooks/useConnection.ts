@@ -23,11 +23,12 @@ export function useConnection() {
 			const data = await api.getConnection();
 			setState( { data, loading: false, error: null } );
 		} catch ( err ) {
-			setState( {
-				data: null,
+			// Keep the last status so a failed reload does not blank the page.
+			setState( ( s ) => ( {
+				...s,
 				loading: false,
 				error: errorMessage( err ),
-			} );
+			} ) );
 		}
 	}, [] );
 

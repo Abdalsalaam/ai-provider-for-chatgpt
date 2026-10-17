@@ -30,24 +30,6 @@ export function App() {
 
 	const isConnected = !! data?.connected;
 
-	const runDisconnect = async () => {
-		try {
-			const next = await api.disconnect();
-			apply( next );
-			void dispatch( noticesStore ).createSuccessNotice(
-				__( 'Local token bundle removed.', 'ai-provider-for-chatgpt' ),
-				{ type: 'snackbar' }
-			);
-		} catch ( err ) {
-			void dispatch( noticesStore ).createErrorNotice(
-				errorMessage( err ),
-				{
-					type: 'snackbar',
-				}
-			);
-		}
-	};
-
 	const runClearCache = async () => {
 		setClearingCache( true );
 		try {
@@ -97,13 +79,6 @@ export function App() {
 								'Clear cached model list',
 								'ai-provider-for-chatgpt'
 							) }
-						</MenuItem>
-						<MenuItem
-							isDestructive
-							disabled={ ! isConnected }
-							onClick={ runDisconnect }
-						>
-							{ __( 'Disconnect', 'ai-provider-for-chatgpt' ) }
 						</MenuItem>
 					</MenuGroup>
 				) }
@@ -160,6 +135,7 @@ export function App() {
 									<ConnectionCard
 										data={ data }
 										apply={ apply }
+										refetch={ refetch }
 									/>
 								) : (
 									<ConnectScreen
