@@ -40,19 +40,26 @@ Prompts and content you send through the AI Client are sent to OpenAI for proces
 1. Upload the plugin files to `/wp-content/plugins/ai-provider-for-chatgpt/`, or install through the WordPress plugin browser.
 2. Activate the plugin through the **Plugins** menu in WordPress.
 3. Go to **Settings > ChatGPT** and click **Continue with ChatGPT**. A ChatGPT sign-in page opens in a new tab.
-4. Sign in, approve the request, and copy the address of the page you land on (it starts with `http://127.0.0.1:1455/auth/callback`).
-5. Paste that address on the settings screen and click **Connect**.
+4. Sign in, keep the agent name, and approve **Use your ChatGPT plan**. The tab then shows an error such as "This site can't be reached" for 127.0.0.1. That is expected.
+5. Copy the full address from that tab's address bar (it starts with `http://127.0.0.1:1455/auth/callback`), paste it on the settings screen, or use **Paste from clipboard**, and click **Connect**.
 6. Any plugin or theme that uses the WordPress AI Client can now generate text with the ChatGPT models your plan offers.
 
 == Frequently Asked Questions ==
 
 = How do I connect? =
 
-On **Settings > ChatGPT**, click **Continue with ChatGPT**, sign in to ChatGPT and approve. Then paste the address of the page you landed on into the settings screen and click **Connect**. The address is valid for 10 minutes; if it expires, click **Start again**.
+**Settings > ChatGPT** shows the steps under **How connecting works**:
+
+1. Click **Continue with ChatGPT**. A ChatGPT sign-in page opens in a new tab.
+2. Sign in, keep the agent name, and approve **Use your ChatGPT plan**.
+3. The tab then shows an error such as "This site can't be reached" for 127.0.0.1. That is expected: nothing is wrong.
+4. Copy the full address from that tab's address bar, come back to the settings tab, paste it and click **Connect**. **Paste from clipboard** pastes it for you; the address starts with `http://127.0.0.1:1455/auth/callback`.
+
+Each sign-in attempt is valid for 10 minutes. If it expires, click **Start again**.
 
 = Why does the browser show a page that cannot load? =
 
-After you approve, ChatGPT sends your browser to `http://127.0.0.1:1455/auth/callback`, an address on your own computer where nothing is listening. That is expected. The page address carries a one-time code; your site exchanges it for tokens when you paste it. The code is useless without the secret your site kept when you clicked **Continue with ChatGPT**.
+After you approve, ChatGPT sends your browser to `http://127.0.0.1:1455/auth/callback`, an address on your own computer where nothing is listening, so the tab shows an error such as "This site can't be reached". That is expected: nothing is wrong. Copy the full address from that tab's address bar and paste it on the settings screen. The page address carries a one-time code; your site exchanges it for tokens when you paste it. The code is useless without the secret your site kept when you clicked **Continue with ChatGPT**.
 
 = Which accounts are eligible? =
 

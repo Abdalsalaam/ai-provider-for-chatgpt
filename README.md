@@ -53,7 +53,14 @@ On the first sign-in OpenAI registers the plugin as an agent named "AI Provider 
 
 2. **Activate the plugin** in WordPress.
 
-3. **Connect.** Go to **Settings > ChatGPT** and click **Continue with ChatGPT**. Sign in and approve in the tab that opens. Your browser then lands on a page at `http://127.0.0.1:1455/auth/callback` that cannot load; that is expected. Copy the full address from the address bar, paste it on the settings screen and click **Connect**. The sign-in attempt is valid for 10 minutes.
+3. **Connect.** Go to **Settings > ChatGPT**. The screen lists the steps under **How connecting works**:
+
+    1. Click **Continue with ChatGPT**. A ChatGPT sign-in page opens in a new tab.
+    2. Sign in, keep the agent name, and approve **Use your ChatGPT plan**.
+    3. The tab then shows an error such as "This site can't be reached" for 127.0.0.1. That is expected: nothing is wrong.
+    4. Copy the full address from that tab's address bar, come back to the settings tab, paste it (or click **Paste from clipboard**) and click **Connect**. The address starts with `http://127.0.0.1:1455/auth/callback`.
+
+    The sign-in attempt is valid for 10 minutes; **Start again** begins a new one.
 
 4. The plugin now appears in the AI provider picker with the models your plan offers.
 
@@ -106,8 +113,9 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 
 ## Troubleshooting
 
-- **The page after approving cannot load.** Expected: copy its address and paste it on the settings screen.
+- **"This site can't be reached" after approving.** Expected: the tab is on `http://127.0.0.1:1455/auth/callback`, where nothing is listening. Copy its full address and paste it on the settings screen.
 - **"Paste the full address of the page you landed on."** The pasted text is not the `http://127.0.0.1:1455/auth/callback?...` address. Copy the whole address bar, not the ChatGPT page.
+- **"Could not read the clipboard."** The browser blocked clipboard access (common when the admin is not on HTTPS). Paste the address with Ctrl+V or Cmd+V.
 - **The sign-in attempt expired, or "No sign-in in progress".** Each attempt is valid for 10 minutes and once. Click **Start again**.
 - **"Your ChatGPT account did not grant plan usage".** Plan usage needs ChatGPT Plus, Pro or Go.
 - **"ChatGPT session ended".** OpenAI ended the session (for example after you disconnected the app in ChatGPT). Sign in again under **Settings > ChatGPT**.
