@@ -158,18 +158,24 @@ class Test_Model_Metadata_Directory extends Test_Case {
 	}
 
 	/**
-	 * Disconnected site lists no models and sends nothing.
+	 * A site with no record lists no models and sends nothing.
 	 */
 	public function test_disconnected_site_lists_no_models_and_sends_nothing() {
-		foreach ( array( new TokenStore(), Api_Test_Helpers::connected_store( array( 'needs_signin' => true ) ) ) as $store ) {
-			try {
-				$this->directory( $store )->listModelMetadata();
-				$this->fail( 'No exception' );
-			} catch ( RuntimeException $e ) {
-				$this->assertContains( $e->getMessage(), array( ChatGptAccountAuthentication::NOT_CONNECTED, ChatGptAccountAuthentication::SESSION_ENDED ) );
-			}
-			( new TokenStore() )->clear();
+		try {
+			$this->directory( new TokenStore() )->listModelMetadata();
+			$this->fail( 'No exception' );
+		} catch ( RuntimeException $e ) {
+			$this->assertSame( ChatGptAccountAuthentication::NOT_CONNECTED, $e->getMessage() );
 		}
+		$this->assertSame( array(), Http_Mock::requests() );
+	}
+
+	/**
+	 * A record that needs a new sign-in still lists models, without calling OpenAI.
+	 */
+	public function test_session_ended_lists_the_bundled_models_without_a_request() {
+		$models = $this->directory( Api_Test_Helpers::connected_store( array( 'needs_signin' => true ) ) )->listModelMetadata();
+		$this->assertSame( ChatGptModelMetadataDirectory::BUNDLED_MODELS, array_map( static fn ( $m ) => $m->getId(), $models ) );
 		$this->assertSame( array(), Http_Mock::requests() );
 	}
 }

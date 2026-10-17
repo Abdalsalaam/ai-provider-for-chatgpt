@@ -94,13 +94,19 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 * Lists the account's models, or the bundled list when the request fails.
 	 *
 	 * Authentication runs first and is not caught, so a site that is not
-	 * connected reports the provider as not configured.
+	 * connected reports the provider as not configured. A record that needs a
+	 * new sign-in lists the bundled models without calling OpenAI, so model
+	 * selection succeeds and the request itself reports the ended session.
 	 *
 	 * @since 1.0.0
 	 *
 	 * @return array<string, ModelMetadata> Models keyed by id.
 	 */
 	protected function sendListModelsRequest(): array {
+		$store = new TokenStore();
+		if ( null !== $store->get() && $store->needs_signin() ) {
+			return self::metadata_map( self::bundled_entries() );
+		}
 		$request = $this->getRequestAuthentication()->authenticateRequest(
 			$this->createRequest( HttpMethodEnum::GET(), 'models' )
 		);
@@ -116,12 +122,28 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 			}
 		}
 		if ( array() === $models ) {
-			$models = array_map( array( self::class, 'to_metadata' ), self::bundled_entries() );
+			return self::metadata_map( self::bundled_entries() );
 		}
 
 		$map = array();
 		foreach ( $models as $model ) {
 			$map[ $model->getId() ] = $model;
+		}
+		return $map;
+	}
+
+	/**
+	 * Builds model metadata keyed by id from normalised entries.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param list<array{id: string, name: string, listed: bool, image: bool}> $entries The entries.
+	 * @return array<string, ModelMetadata>
+	 */
+	private static function metadata_map( array $entries ): array {
+		$map = array();
+		foreach ( $entries as $entry ) {
+			$map[ $entry['id'] ] = self::to_metadata( $entry );
 		}
 		return $map;
 	}
