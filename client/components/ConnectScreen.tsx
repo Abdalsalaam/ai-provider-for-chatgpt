@@ -1,11 +1,13 @@
 import { useState } from '@wordpress/element';
 import { TextControl } from '@wordpress/components';
 import { Button, Notice } from '@wordpress/ui';
+import { lock as lockIcon } from '@wordpress/icons';
 import { __, sprintf } from '@wordpress/i18n';
 
 import { EMPTY_FIELD, useSignIn } from '../hooks/useSignIn';
 import { formatClock } from '../utils';
 import { ChatGptIcon } from './ChatGptIcon';
+import { ForgetAccountModal } from './ForgetAccountModal';
 import type { ConnectionStatus, SignInStart } from '../types';
 
 const ELIGIBILITY_URL =
@@ -14,7 +16,7 @@ const ELIGIBILITY_URL =
 // Reopens the current attempt's sign-in page without starting a new attempt.
 function reopenSignIn( start: SignInStart | null ) {
 	if ( start ) {
-		window.open( start.authorize_url, '_blank', 'noopener' );
+		window.open( start.authorize_url, '_blank', 'noopener,noreferrer' );
 	}
 }
 
@@ -27,6 +29,18 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 	const signIn = useSignIn( onConnected );
 	const [ callbackUrl, setCallbackUrl ] = useState( '' );
 	const [ clipboardFailed, setClipboardFailed ] = useState( false );
+	const [ confirmForget, setConfirmForget ] = useState( false );
+
+	// A signed-out site keeps its registration and account until it is forgotten.
+	const canForget = ! status.connected && status.client_id !== null;
+	const rememberedAccount = canForget ? status.email ?? status.name : null;
+
+	const onForgotten = ( next: ConnectionStatus ) => {
+		setConfirmForget( false );
+		setCallbackUrl( '' );
+		signIn.reset();
+		onConnected( next );
+	};
 
 	const restart = () => {
 		setCallbackUrl( '' );
@@ -115,9 +129,41 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 							</Notice.ActionLink>
 						</Notice.Actions>
 					) }
+					{ signIn.error?.code === 'account_mismatch' &&
+						canForget && (
+							<Notice.Actions>
+								<Notice.ActionButton
+									onClick={ () => setConfirmForget( true ) }
+								>
+									{ __(
+										'Use a different ChatGPT account',
+										'ai-provider-for-chatgpt'
+									) }
+								</Notice.ActionButton>
+							</Notice.Actions>
+						) }
 					<Notice.CloseIcon onClick={ signIn.clearError } />
 				</Notice.Root>
 			) }
+
+			<Notice.Root
+				intent="info"
+				icon={ lockIcon }
+				className="ai-provider-for-chatgpt-privacy"
+			>
+				<Notice.Title>
+					{ __(
+						'Your ChatGPT account stays private',
+						'ai-provider-for-chatgpt'
+					) }
+				</Notice.Title>
+				<Notice.Description>
+					{ __(
+						'This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. Your website keeps the connection encrypted in its own database and talks to OpenAI directly. The connection cannot read your ChatGPT conversations or memories. You can disconnect at any time on this page or in your ChatGPT settings.',
+						'ai-provider-for-chatgpt'
+					) }
+				</Notice.Description>
+			</Notice.Root>
 
 			<h3 className="ai-provider-for-chatgpt-steps-title">
 				{ __( 'How connecting works', 'ai-provider-for-chatgpt' ) }
@@ -154,6 +200,33 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 					) }
 				</figcaption>
 			</figure>
+
+			{ ! signIn.start && canForget && (
+				<p className="ai-provider-for-chatgpt-actions-row">
+					{ rememberedAccount && (
+						<span>
+							{ sprintf(
+								/* translators: %s: email, or name, of the ChatGPT account this site remembers. */
+								__(
+									'Sign in again as %s',
+									'ai-provider-for-chatgpt'
+								),
+								rememberedAccount
+							) }
+						</span>
+					) }
+					<Button
+						variant="minimal"
+						size="small"
+						onClick={ () => setConfirmForget( true ) }
+					>
+						{ __(
+							'Use a different ChatGPT account',
+							'ai-provider-for-chatgpt'
+						) }
+					</Button>
+				</p>
+			) }
 
 			{ ! signIn.start && (
 				<p className="ai-provider-for-chatgpt-actions-row">
@@ -282,6 +355,12 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 							  ) }
 					</p>
 				</div>
+			) }
+			{ confirmForget && canForget && (
+				<ForgetAccountModal
+					onClose={ () => setConfirmForget( false ) }
+					onForgotten={ onForgotten }
+				/>
 			) }
 		</div>
 	);

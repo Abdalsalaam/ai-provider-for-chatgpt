@@ -140,3 +140,7 @@ body.settings_page_ai-provider-for-chatgpt #wpcontent {
 	color: #50575e;
 	font-size: 12px;
 }
+
+.ai-provider-for-chatgpt-privacy {
+	margin: 1.5em 0 0;
+}
