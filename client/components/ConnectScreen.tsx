@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { TextControl } from '@wordpress/components';
 import { Button, Notice } from '@wordpress/ui';
+import { lock as lockIcon } from '@wordpress/icons';
 import { __, sprintf } from '@wordpress/i18n';
 
 import { EMPTY_FIELD, useSignIn } from '../hooks/useSignIn';
@@ -144,6 +145,25 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 					<Notice.CloseIcon onClick={ signIn.clearError } />
 				</Notice.Root>
 			) }
+
+			<Notice.Root
+				intent="info"
+				icon={ lockIcon }
+				className="ai-provider-for-chatgpt-privacy"
+			>
+				<Notice.Title>
+					{ __(
+						'Your ChatGPT account stays private',
+						'ai-provider-for-chatgpt'
+					) }
+				</Notice.Title>
+				<Notice.Description>
+					{ __(
+						'This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. Your website keeps the connection encrypted in its own database and talks to OpenAI directly. The connection cannot read your ChatGPT conversations or memories. You can disconnect at any time on this page or in your ChatGPT settings.',
+						'ai-provider-for-chatgpt'
+					) }
+				</Notice.Description>
+			</Notice.Root>
 
 			<h3 className="ai-provider-for-chatgpt-steps-title">
 				{ __( 'How connecting works', 'ai-provider-for-chatgpt' ) }
