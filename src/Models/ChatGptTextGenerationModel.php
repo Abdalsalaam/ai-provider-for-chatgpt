@@ -32,43 +32,11 @@ use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 
 /**
- * Text generation model targeting the Codex backend `/responses` endpoint.
+ * Text generation model for the Responses API at api.openai.com.
  *
- * The request and response shapes match the standard OpenAI Responses API,
- * so the body of this class mirrors the OpenAI provider's text model with
- * three differences: the endpoint URL, the authenticator class, and a
- * single refresh-and-retry on HTTP 401.
+ * Requests always stream, and the result is built from the stream events.
  *
  * @since 0.1.0
- *
- * @phpstan-type OutputContentData array{
- *     type: string,
- *     text?: string,
- *     call_id?: string,
- *     name?: string,
- *     arguments?: string
- * }
- * @phpstan-type OutputItemData array{
- *     type: string,
- *     id?: string,
- *     role?: string,
- *     status?: string,
- *     content?: list<OutputContentData>,
- *     call_id?: string,
- *     name?: string,
- *     arguments?: string
- * }
- * @phpstan-type UsageData array{
- *     input_tokens?: int,
- *     output_tokens?: int,
- *     total_tokens?: int
- * }
- * @phpstan-type ResponseData array{
- *     id?: string,
- *     status?: string,
- *     output?: list<OutputItemData>,
- *     usage?: UsageData
- * }
  */
 class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGenerationModelInterface {
 
@@ -160,94 +128,188 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	}
 
 	/**
-	 * Parses a Codex SSE stream response body into a {@see GenerativeAiResult}.
+	 * Builds the result from a /responses event stream.
 	 *
-	 * The Codex backend always streams; the final `response.completed` event
-	 * carries the complete response object in the same shape as the standard
-	 * non-streaming OpenAI Responses API, so we extract that and reuse the
-	 * existing JSON parser.
+	 * The route sends `response.completed` with an empty `output`, so the parts
+	 * come from the `response.output_item.done` events.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param Response $response The HTTP response with an SSE-encoded body.
+	 * @param Response $response The HTTP response with an SSE body.
 	 * @return GenerativeAiResult The parsed result.
-	 * @throws RuntimeException When no `response.completed` event is present.
+	 * @throws RuntimeException When the stream fails, ends early, or produced no output.
 	 */
 	protected function parseStreamingResponseToGenerativeAiResult( Response $response ): GenerativeAiResult {
-		$body                  = (string) $response->getBody();
-		$final_response        = null;
-		$accumulated_outputs   = array();
-
-		// SSE events are separated by blank lines. Each event is one or more
-		// "field: value" lines; we only care about "event:" and "data:".
-		$events = preg_split( "/\r?\n\r?\n/", $body );
-		if ( false === $events ) {
-			$events = array();
-		}
-		foreach ( $events as $raw_event ) {
-			$event_name = '';
-			$data_lines = array();
-			$lines      = preg_split( "/\r?\n/", $raw_event );
-			if ( false === $lines ) {
-				$lines = array();
+		$final = null;
+		$items = array();
+		foreach ( self::parse_sse_events( (string) $response->getBody() ) as list( $name, $data ) ) {
+			if ( 'response.output_item.done' === $name && isset( $data['item'] ) && is_array( $data['item'] ) ) {
+				$items[] = $data['item'];
+			} elseif ( ( 'response.completed' === $name || 'response.incomplete' === $name ) && isset( $data['response'] ) && is_array( $data['response'] ) ) {
+				$final = $data['response'];
+			} elseif ( 'response.failed' === $name || 'error' === $name ) {
+				throw new RuntimeException( esc_html( self::failure_message( $data ) ) );
 			}
-			foreach ( $lines as $line ) {
+		}
+		if ( null === $final ) {
+			throw new RuntimeException( 'ChatGPT stream ended before response.completed.' );
+		}
+
+		// A server that fills `output` on completion is used only when no item events came.
+		if ( array() === $items && isset( $final['output'] ) && is_array( $final['output'] ) ) {
+			$items = $final['output'];
+		}
+		$status    = isset( $final['status'] ) && is_string( $final['status'] ) ? $final['status'] : 'completed';
+		$reason    = $final['incomplete_details']['reason'] ?? '';
+		$candidate = $this->build_candidate( $items, $status, is_string( $reason ) ? $reason : '' );
+
+		$usage       = isset( $final['usage'] ) && is_array( $final['usage'] ) ? $final['usage'] : array();
+		$input       = (int) ( $usage['input_tokens'] ?? 0 );
+		$output      = (int) ( $usage['output_tokens'] ?? 0 );
+		$token_usage = new TokenUsage( $input, $output, (int) ( $usage['total_tokens'] ?? $input + $output ) );
+
+		$additional = $final;
+		unset( $additional['id'], $additional['output'], $additional['usage'] );
+
+		return new GenerativeAiResult(
+			isset( $final['id'] ) && is_string( $final['id'] ) ? $final['id'] : '',
+			array( $candidate ),
+			$token_usage,
+			$this->providerMetadata(),
+			$this->metadata(),
+			$additional
+		);
+	}
+
+	/**
+	 * Splits an SSE body into event names and decoded data.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param string $body The SSE body.
+	 * @return list<array{0: string, 1: array<string, mixed>}> Name and data per event.
+	 */
+	protected static function parse_sse_events( string $body ): array {
+		$events = array();
+		$blocks = preg_split( "/\r?\n\r?\n/", str_replace( "\r\n", "\n", $body ) );
+		foreach ( false === $blocks ? array() : $blocks as $block ) {
+			$name  = '';
+			$lines = array();
+			foreach ( explode( "\n", $block ) as $line ) {
 				if ( 0 === strncmp( $line, 'event:', 6 ) ) {
-					$event_name = trim( substr( $line, 6 ) );
+					$name = trim( substr( $line, 6 ) );
 				} elseif ( 0 === strncmp( $line, 'data:', 5 ) ) {
-					$data_lines[] = ltrim( substr( $line, 5 ), ' ' );
+					$lines[] = ltrim( substr( $line, 5 ), ' ' );
 				}
 			}
-			if ( array() === $data_lines ) {
+			$data = json_decode( implode( "\n", $lines ), true );
+			if ( ! is_array( $data ) ) {
 				continue;
 			}
-			$decoded = json_decode( implode( "\n", $data_lines ), true );
-			if ( ! is_array( $decoded ) ) {
+			// An event without an event line is named by its type field.
+			if ( '' === $name && isset( $data['type'] ) && is_string( $data['type'] ) ) {
+				$name = $data['type'];
+			}
+			$events[] = array( $name, $data );
+		}
+		return $events;
+	}
+
+	/**
+	 * Builds one model candidate from the output items, in stream order.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<int, mixed> $items  Output items.
+	 * @param string            $status Response status.
+	 * @param string            $reason Incomplete reason, empty when complete.
+	 * @return Candidate
+	 * @throws RuntimeException When an incomplete response produced no part.
+	 * @throws ResponseException When a complete response produced no part.
+	 */
+	private function build_candidate( array $items, string $status, string $reason ): Candidate {
+		$parts     = array();
+		$has_calls = false;
+		foreach ( $items as $index => $item ) {
+			if ( ! is_array( $item ) ) {
 				continue;
 			}
-
-			if ( 'response.completed' === $event_name
-				&& isset( $decoded['response'] ) && is_array( $decoded['response'] )
-			) {
-				$final_response = $decoded['response'];
-				continue;
+			$type = $item['type'] ?? '';
+			if ( 'message' === $type && isset( $item['content'] ) && is_array( $item['content'] ) ) {
+				foreach ( $item['content'] as $content_index => $content ) {
+					try {
+						$part = is_array( $content ) ? $this->parseOutputContentToPart( $content ) : null;
+					} catch ( InvalidArgumentException $e ) {
+						throw ResponseException::fromInvalidData(
+							esc_html( $this->providerMetadata()->getName() ),
+							esc_html( "output[{$index}].content[{$content_index}]" ),
+							esc_html( $e->getMessage() )
+						);
+					}
+					if ( null !== $part ) {
+						$parts[]   = $part;
+						$has_calls = $has_calls || $part->getType()->isFunctionCall();
+					}
+				}
+			} elseif ( 'function_call' === $type ) {
+				$parts[]   = $this->function_call_part( $item, (int) $index );
+				$has_calls = true;
 			}
+		}
+		if ( array() === $parts && 'incomplete' === $status ) {
+			throw new RuntimeException( esc_html( sprintf( 'ChatGPT response was incomplete (%s).', '' !== $reason ? $reason : 'unknown' ) ) );
+		}
+		if ( array() === $parts ) {
+			throw ResponseException::fromMissingData( esc_html( $this->providerMetadata()->getName() ), 'output' );
+		}
+		if ( 'incomplete' === $status ) {
+			// Partial output is returned, flagged by why the server stopped.
+			$finish = 'content_filter' === $reason ? FinishReasonEnum::contentFilter() : FinishReasonEnum::length();
+		} else {
+			$finish = $this->parseStatusToFinishReason( $status, $has_calls );
+		}
+		return new Candidate( new Message( MessageRoleEnum::model(), $parts ), $finish );
+	}
 
-			// Accumulate per-item events as a fallback. The Codex backend's
-			// `response.completed` payload sometimes ships an empty `output`,
-			// with the actual content delivered only via these item events.
-			if ( 'response.output_item.done' === $event_name
-				&& isset( $decoded['item'] ) && is_array( $decoded['item'] )
-			) {
-				$accumulated_outputs[] = $decoded['item'];
+	/**
+	 * Builds a function call part from a `function_call` output item.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $item  The output item.
+	 * @param int                  $index Its position in the output.
+	 * @return MessagePart
+	 * @throws ResponseException When the call id or name is missing.
+	 */
+	private function function_call_part( array $item, int $index ): MessagePart {
+		if ( ! isset( $item['call_id'] ) || ! is_string( $item['call_id'] ) ) {
+			throw ResponseException::fromMissingData( esc_html( $this->providerMetadata()->getName() ), esc_html( "output[{$index}].call_id" ) );
+		}
+		if ( ! isset( $item['name'] ) || ! is_string( $item['name'] ) ) {
+			throw ResponseException::fromMissingData( esc_html( $this->providerMetadata()->getName() ), esc_html( "output[{$index}].name" ) );
+		}
+		$args = null;
+		if ( isset( $item['arguments'] ) && is_string( $item['arguments'] ) ) {
+			$decoded = json_decode( $item['arguments'], true );
+			if ( is_array( $decoded ) && array() !== $decoded ) {
+				$args = $decoded;
 			}
 		}
+		return new MessagePart( new FunctionCall( $item['call_id'], $item['name'], $args ) );
+	}
 
-		if ( null === $final_response ) {
-			throw new RuntimeException(
-				'ChatGPT stream did not contain a response.completed event. Body head: '
-				. esc_html( substr( $body, 0, 400 ) )
-			);
-		}
-
-		// Backfill output from per-item events when the completed payload
-		// didn't include it (Codex backend behavior changed in a recent
-		// update — output is streamed per-item and not duplicated).
-		if (
-			( ! isset( $final_response['output'] ) || ! is_array( $final_response['output'] ) || array() === $final_response['output'] )
-			&& array() !== $accumulated_outputs
-		) {
-			$final_response['output'] = $accumulated_outputs;
-		}
-
-		// Re-wrap the extracted payload as a normal Response so the existing
-		// JSON parser can consume it unchanged.
-		$json_response = new Response(
-			200,
-			array( 'Content-Type' => array( 'application/json' ) ),
-			(string) wp_json_encode( $final_response )
-		);
-		return $this->parseResponseToGenerativeAiResult( $json_response );
+	/**
+	 * Builds the message for a failed response or an error event.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $data Event data.
+	 * @return string
+	 */
+	private static function failure_message( array $data ): string {
+		// A failed response nests the error; an error event carries it at the top.
+		$error = $data['response']['error'] ?? $data;
+		return ( is_array( $error ) ? ResponsesError::from_error( $error ) : null ) ?? 'ChatGPT response failed.';
 	}
 
 	/**
@@ -517,178 +579,6 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 			);
 		}
 		return $tools;
-	}
-
-	/**
-	 * Parses the API response into a {@see GenerativeAiResult}.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param Response $response The raw response.
-	 * @return GenerativeAiResult The parsed result.
-	 * @throws ResponseException When the response is missing the `output` field.
-	 */
-	protected function parseResponseToGenerativeAiResult( Response $response ): GenerativeAiResult {
-		/**
-		 * Decoded response payload.
-		 *
-		 * @var ResponseData $response_data
-		 */
-		$response_data = $response->getData();
-
-		if ( ! isset( $response_data['output'] ) || ! $response_data['output'] ) {
-			$keys = is_array( $response_data ) ? implode( ', ', array_keys( $response_data ) ) : '(non-array)';
-			throw ResponseException::fromMissingData(
-				esc_html( $this->providerMetadata()->getName() ),
-				esc_html( 'output (top-level keys present: ' . $keys . ')' )
-			);
-		}
-		if ( ! is_array( $response_data['output'] ) || ! array_is_list( $response_data['output'] ) ) {
-			throw ResponseException::fromInvalidData(
-				esc_html( $this->providerMetadata()->getName() ),
-				'output',
-				'The value must be an indexed array.'
-			);
-		}
-
-		$candidates = array();
-		foreach ( $response_data['output'] as $index => $output_item ) {
-			if ( ! is_array( $output_item ) || array_is_list( $output_item ) ) {
-				throw ResponseException::fromInvalidData(
-					esc_html( $this->providerMetadata()->getName() ),
-					esc_html( "output[{$index}]" ),
-					'The value must be an associative array.'
-				);
-			}
-			$candidate = $this->parseOutputItemToCandidate( $output_item, $index, $response_data['status'] ?? 'completed' );
-			if ( null !== $candidate ) {
-				$candidates[] = $candidate;
-			}
-		}
-
-		$id = isset( $response_data['id'] ) && is_string( $response_data['id'] ) ? $response_data['id'] : '';
-
-		if ( isset( $response_data['usage'] ) && is_array( $response_data['usage'] ) ) {
-			$usage      = $response_data['usage'];
-			$token_usage = new TokenUsage(
-				$usage['input_tokens'] ?? 0,
-				$usage['output_tokens'] ?? 0,
-				$usage['total_tokens'] ?? ( ( $usage['input_tokens'] ?? 0 ) + ( $usage['output_tokens'] ?? 0 ) )
-			);
-		} else {
-			$token_usage = new TokenUsage( 0, 0, 0 );
-		}
-
-		$additional_data = $response_data;
-		unset( $additional_data['id'], $additional_data['output'], $additional_data['usage'] );
-
-		return new GenerativeAiResult(
-			$id,
-			$candidates,
-			$token_usage,
-			$this->providerMetadata(),
-			$this->metadata(),
-			$additional_data
-		);
-	}
-
-	/**
-	 * Converts one output item from the response to a {@see Candidate}.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $output_item     The output item.
-	 * @param int                  $index          The index in the output array.
-	 * @param string               $response_status The overall response status.
-	 * @return Candidate|null The candidate, or null when the item should be skipped.
-	 */
-	protected function parseOutputItemToCandidate( array $output_item, int $index, string $response_status ): ?Candidate {
-		$type = $output_item['type'] ?? '';
-		if ( 'message' === $type ) {
-			return $this->parseMessageOutputToCandidate( $output_item, $index, $response_status );
-		}
-		if ( 'function_call' === $type ) {
-			return $this->parseFunctionCallOutputToCandidate( $output_item, $index );
-		}
-		return null;
-	}
-
-	/**
-	 * Builds a candidate from a `message`-typed output item.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $output_item     The output item.
-	 * @param int                  $index          The index in the output array.
-	 * @param string               $response_status The overall response status.
-	 * @return Candidate The candidate.
-	 * @throws ResponseException When required response fields are missing.
-	 */
-	protected function parseMessageOutputToCandidate( array $output_item, int $index, string $response_status ): Candidate {
-		$role = isset( $output_item['role'] ) && 'user' === $output_item['role']
-			? MessageRoleEnum::user()
-			: MessageRoleEnum::model();
-
-		$parts            = array();
-		$has_function_calls = false;
-
-		if ( isset( $output_item['content'] ) && is_array( $output_item['content'] ) ) {
-			foreach ( $output_item['content'] as $content_index => $content_item ) {
-				try {
-					$part = $this->parseOutputContentToPart( $content_item );
-				} catch ( InvalidArgumentException $e ) {
-					throw ResponseException::fromInvalidData(
-						esc_html( $this->providerMetadata()->getName() ),
-						esc_html( "output[{$index}].content[{$content_index}]" ),
-						esc_html( $e->getMessage() )
-					);
-				}
-				if ( null !== $part ) {
-					$parts[] = $part;
-					if ( $part->getType()->isFunctionCall() ) {
-						$has_function_calls = true;
-					}
-				}
-			}
-		}
-
-		return new Candidate(
-			new Message( $role, $parts ),
-			$this->parseStatusToFinishReason( $response_status, $has_function_calls )
-		);
-	}
-
-	/**
-	 * Builds a candidate from a top-level `function_call` output item.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $output_item The output item.
-	 * @param int                  $index      The index in the output array.
-	 * @return Candidate The candidate.
-	 * @throws ResponseException When the output item is missing required call data.
-	 */
-	protected function parseFunctionCallOutputToCandidate( array $output_item, int $index ): Candidate {
-		if ( ! isset( $output_item['call_id'] ) || ! is_string( $output_item['call_id'] ) ) {
-			throw ResponseException::fromMissingData( esc_html( $this->providerMetadata()->getName() ), esc_html( "output[{$index}].call_id" ) );
-		}
-		if ( ! isset( $output_item['name'] ) || ! is_string( $output_item['name'] ) ) {
-			throw ResponseException::fromMissingData( esc_html( $this->providerMetadata()->getName() ), esc_html( "output[{$index}].name" ) );
-		}
-
-		$args = null;
-		if ( isset( $output_item['arguments'] ) && is_string( $output_item['arguments'] ) ) {
-			$decoded = json_decode( $output_item['arguments'], true );
-			if ( is_array( $decoded ) && count( $decoded ) > 0 ) {
-				$args = $decoded;
-			}
-		}
-
-		$part = new MessagePart( new FunctionCall( $output_item['call_id'], $output_item['name'], $args ) );
-		return new Candidate(
-			new Message( MessageRoleEnum::model(), array( $part ) ),
-			FinishReasonEnum::toolCalls()
-		);
 	}
 
 	/**
