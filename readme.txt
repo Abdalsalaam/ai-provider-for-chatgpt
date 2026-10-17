@@ -87,6 +87,10 @@ No. The plugin registers ChatGPT with the AI Client provider registry, so the AI
 
 No. This release covers text generation, chat, tool use, structured output and image input.
 
+= Can the plugin developer see my ChatGPT account? =
+
+No. This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. Your website keeps the connection encrypted in its own database and talks to OpenAI directly; the plugin contacts no other service (see **External services**). The connection cannot read your ChatGPT conversations or memories: it only lets your site use your plan for AI requests, as OpenAI explains in [Using your ChatGPT plan in other apps and sites](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites) and in the [Sign in with ChatGPT documentation](https://developers.openai.com/siwc/token-sharing-open-source). You can disconnect at any time on **Settings > ChatGPT** or in your ChatGPT settings.
+
 = How are tokens stored? =
 
 Tokens are stored in the WordPress options table on your own site, encrypted with `sodium_crypto_secretbox` using a key derived from your `wp-config.php` salts. They are sent only to OpenAI, to make requests and to refresh or revoke the connection.
