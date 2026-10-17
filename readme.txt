@@ -1,94 +1,132 @@
-=== AI Provider for ChatGPT ===
+=== AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed ===
 Contributors: abdalsalaam
-Tags: ai, chatgpt, openai, ai-provider, chatbot
+Tags: chatgpt, openai, ai, connector, ai-provider
 Requires at least: 6.9
 Tested up to: 7.1
-Stable tag: 0.1.4
+Stable tag: 1.0.0
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Adds ChatGPT (OpenAI) as a first-class provider for the WordPress AI Client, authenticated with a ChatGPT account instead of an API key.
+Connect your ChatGPT Plus, Pro or Go plan to WordPress AI features with Sign in with ChatGPT. No OpenAI API key needed.
 
 == Description ==
 
-AI Provider for ChatGPT registers OpenAI with the WordPress AI Client and authenticates each request using an OAuth token associated with a ChatGPT account (Free / Plus / Pro). API usage is billed against the connected ChatGPT subscription rather than a separate OpenAI API account.
+AI Provider for ChatGPT connects the AI features in WordPress to your own ChatGPT plan. You sign in with Sign in with ChatGPT, OpenAI's official sign-in for apps that use a ChatGPT plan, and AI requests from your site are billed to that ChatGPT Plus, Pro or Go plan. You do not need an OpenAI API key or a separate API account.
 
-Any plugin or theme that uses the AI Client can call ChatGPT models the same way it calls Kimi, Google, or Anthropic.
+Any plugin or theme that uses the WordPress AI Client can call ChatGPT models the same way it calls other providers.
+
+Connecting takes about a minute and the settings screen walks you through every step. Your ChatGPT account stays private: the plugin runs only on your website, and the plugin developer never receives your sign-in, your tokens or anything you send.
 
 **Features:**
 
-* Text generation with ChatGPT models (GPT-4o, GPT-4.1, o-series, and others exposed by the connected account)
+* Text generation with the models your ChatGPT plan offers, listed from your account
 * Multi-turn chat history
 * Function calling and tool use
 * Structured output via JSON schema
-* Dynamic model discovery from the connected account
-* Settings screen for connecting an account, with built-in connection diagnostics
+* Image input
+* A guided settings screen: step-by-step instructions, Paste from clipboard, and a button to reopen the ChatGPT sign-in page
+* Refresh, disconnect and switch to a different ChatGPT account from the settings screen, with connection diagnostics
+* Clear messages when your ChatGPT session ends or your plan's usage limit is reached, with a link to manage usage in ChatGPT
 
 **Requirements:**
 
 * PHP 7.4 or higher, with the `sodium` and `openssl` extensions
-* A ChatGPT Free, Plus, or Pro account (Business / Edu / Enterprise are not supported)
+* A ChatGPT Plus, Pro or Go account. Free accounts are not eligible for plan usage.
 * WordPress 7.0+ (AI Client is bundled in core), or WordPress 6.9 with the [WordPress/php-ai-client](https://github.com/WordPress/php-ai-client) package installed
 
-**Privacy & data sharing:**
+**Privacy:**
 
-When this plugin is used, prompts and content you send through the AI Client are transmitted to OpenAI's servers for processing. Review the [OpenAI Privacy Policy](https://openai.com/policies/privacy-policy/) and [Terms of Use](https://openai.com/policies/terms-of-use/) before enabling this provider on a production site. See the **External services** section below for full details on what data is sent and when.
+Prompts and content you send through the AI Client are sent to OpenAI for processing. Requests are sent with store set to false, so OpenAI does not keep them for later retrieval. OpenAI's privacy policy covers how your content is handled. Your tokens are stored encrypted in your site's database and are sent only to OpenAI. See the **External services** section for what is sent and when.
 
 == Installation ==
 
 1. Upload the plugin files to `/wp-content/plugins/ai-provider-for-chatgpt/`, or install through the WordPress plugin browser.
 2. Activate the plugin through the **Plugins** menu in WordPress.
-3. Visit **Settings → ChatGPT** and follow the on-screen instructions to connect a ChatGPT account.
-4. Any plugin or theme that uses the WordPress AI Client can now generate text with the ChatGPT models available to your account.
+3. Go to **Settings > ChatGPT** and click **Continue with ChatGPT**. A ChatGPT sign-in page opens in a new tab.
+4. Sign in, keep the agent name, and approve **Use your ChatGPT plan**. The tab then shows an error such as "This site can't be reached" for 127.0.0.1. That is expected.
+5. Copy the full address from that tab's address bar (it starts with `http://127.0.0.1:1455/auth/callback`), paste it on the settings screen, or use **Paste from clipboard**, and click **Connect**.
+6. Any plugin or theme that uses the WordPress AI Client can now generate text with the ChatGPT models your plan offers.
 
 == Frequently Asked Questions ==
 
-= How do I connect a ChatGPT account? =
+= How do I connect? =
 
-On **Settings → ChatGPT**, click **Connect with ChatGPT**. The page shows a one-line `npx` command — run it on your laptop, sign in to OpenAI in the browser window that opens, and the WordPress tab connects automatically. No file copying.
+**Settings > ChatGPT** shows the steps under **How connecting works**:
 
-If you'd rather use the Codex CLI bundle you already have, the same screen has an **Advanced** option to paste or upload `~/.codex/auth.json`.
+1. Click **Continue with ChatGPT**. A ChatGPT sign-in page opens in a new tab.
+2. Sign in, keep the agent name, and approve **Use your ChatGPT plan**.
+3. The tab then shows an error such as "This site can't be reached" for 127.0.0.1. That is expected: nothing is wrong.
+4. Copy the full address from that tab's address bar, come back to the settings tab, paste it and click **Connect**. **Paste from clipboard** pastes it for you; the address starts with `http://127.0.0.1:1455/auth/callback`.
+
+If no ChatGPT tab opened, click **Open ChatGPT sign-in** under "Didn't see the ChatGPT tab?". It reopens the same sign-in page and keeps the countdown.
+
+Each sign-in attempt is valid for 10 minutes. If it expires, click **Start again**.
+
+= Why does the browser show a page that cannot load? =
+
+After you approve, ChatGPT sends your browser to `http://127.0.0.1:1455/auth/callback`, an address on your own computer where nothing is listening, so the tab shows an error such as "This site can't be reached". That is expected: nothing is wrong. Copy the full address from that tab's address bar and paste it on the settings screen. The page address carries a one-time code; your site exchanges it for tokens when you paste it. The code is useless without the secret your site kept when you clicked **Continue with ChatGPT**.
+
+= Which accounts are eligible? =
+
+ChatGPT Plus, Pro and Go accounts. OpenAI grants plan usage to other apps only on these plans. If your account does not grant plan usage, the plugin shows a message and saves nothing.
+
+= How do I connect a different ChatGPT account? =
+
+Disconnect keeps the site's registration with OpenAI, so the next sign-in reuses it and must use the same ChatGPT account. To switch accounts, click **Use a different ChatGPT account** on **Settings > ChatGPT**. It revokes any stored tokens and deletes the site's copy of the registration (the issued client id and the account's id, email and name); the app stays listed under ChatGPT **Settings > Security and login > Sign in with ChatGPT**, where you can disconnect it. Then sign in with the other account.
+
+= Where do I manage usage? =
+
+Usage and per-app limits are at [https://chatgpt.com/settings/usage](https://chatgpt.com/settings/usage). The settings screen links there with **Manage usage in ChatGPT**. To disconnect the plugin from your ChatGPT account, go to ChatGPT **Settings > Security and login > Sign in with ChatGPT** and select **Disconnect**.
+
+= I used version 0.1.x. What changes? =
+
+Version 1.0.0 connects with Sign in with ChatGPT and no longer uses the command line tool or `auth.json` files. Existing connections are removed on update; sign in again under **Settings > ChatGPT**. Free accounts are no longer eligible.
 
 = Does this plugin work without the WordPress AI Client? =
 
-No. The plugin registers ChatGPT with the AI Client provider registry, so the AI Client must be available — either bundled in WordPress 7.0+ or installed as a separate package on 6.9.
-
-= Which models are supported? =
-
-Any chat-completion model exposed by the OpenAI Responses API for the connected account. The list is refreshed automatically.
+No. The plugin registers ChatGPT with the AI Client provider registry, so the AI Client must be available, either bundled in WordPress 7.0+ or installed as a separate package on 6.9.
 
 = Does it support image generation? =
 
-Not yet. This release covers text generation, chat, tool use, and structured output.
+No. OpenAI does not allow image generation for apps that use a ChatGPT plan through Sign in with ChatGPT; it is only available with an OpenAI API key. If your site needs image generation, use the official AI Provider for OpenAI plugin with an API key next to this one. This plugin covers text generation, chat, tool use, structured output and image input (reading images you attach).
+
+= Can the plugin developer see my ChatGPT account? =
+
+No. This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. Your website keeps the connection encrypted in its own database and talks to OpenAI directly; the plugin contacts no other service (see **External services**). The connection cannot read your ChatGPT conversations or memories; it only lets your site use your plan for AI requests. OpenAI says so in [Using your ChatGPT plan in other apps and sites](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites) (conversations and memories) and in the [Sign in with ChatGPT documentation](https://developers.openai.com/siwc/token-sharing-open-source) (conversations). You can disconnect at any time on **Settings > ChatGPT**, or under ChatGPT **Settings > Security and login > Sign in with ChatGPT**.
 
 = How are tokens stored? =
 
-Tokens are stored in the WordPress options table on your own site, encrypted at rest with `sodium_crypto_secretbox` keyed off `wp-config.php` salts. They are never transmitted anywhere except to OpenAI when fulfilling a request or refreshing the access token.
+Tokens are stored in the WordPress options table on your own site, encrypted with `sodium_crypto_secretbox` using a key derived from your `wp-config.php` salts. They are sent only to OpenAI, to make requests and to refresh or revoke the connection.
 
 == External services ==
 
-This plugin relies on OpenAI's online APIs, an external service operated by OpenAI, L.L.C. The connection is required so the WordPress AI Client can authenticate with your ChatGPT account and route requests to ChatGPT models from your site. The plugin contacts two OpenAI-operated domains: `auth.openai.com` (token refresh) and `chatgpt.com` (model list and text generation). No data is sent to OpenAI until you connect an account and one of the actions below occurs.
+This plugin connects to services operated by OpenAI, L.L.C. so the WordPress AI Client can use your ChatGPT plan. Nothing is sent to OpenAI until an administrator starts a sign-in. The plugin contacts two OpenAI domains, `auth.openai.com` and `api.openai.com`, and no other third-party service.
 
-The plugin contacts the following endpoints:
-
-* **`POST https://auth.openai.com/oauth/token`** — called when the stored access token is about to expire, to obtain a fresh one. The request transmits the OAuth `client_id`, the refresh token (decrypted only in transit from your WordPress options table), and the `refresh_token` grant type. No prompt or user content is sent.
-* **`GET https://chatgpt.com/backend-api/codex/models`** — called from the **Settings → ChatGPT** screen (including the optional diagnostics "remote models" probe) and when the AI Client refreshes its model list. The access token (`Authorization` header), the `ChatGPT-Account-ID` header, and a `client_version` query parameter are sent so OpenAI can return the list of models available to the connected account. No prompt or user content is sent.
-* **`POST https://chatgpt.com/backend-api/codex/responses`** — called whenever any plugin or theme on your site uses the WordPress AI Client to generate text with a ChatGPT model. The request includes the access token, the `ChatGPT-Account-ID` of the connected account, and the prompt/messages, system instructions, tool definitions, and any other parameters supplied by the calling code (for example, conversation history, JSON schema for structured output, or files attached to the prompt).
-
-Your OAuth tokens are stored encrypted in your site's WordPress options table and are only transmitted to OpenAI to authenticate the requests above. The plugin does not send your data to any other third-party service.
+* **`https://auth.openai.com/api/accounts/authorize`** is opened in the administrator's browser when they click **Continue with ChatGPT**. The address carries the client id, a stable id for this site, the requested permissions, a one-time state and nonce, and a PKCE challenge. On the first sign-in it also carries the agent name "AI Provider for ChatGPT" (not when the `CHATGPT_OAUTH_CLIENT_ID` constant is set). On a new sign-in for an existing connection it carries the connected account's email and ID token as hints.
+* **`POST https://auth.openai.com/api/accounts/oauth/token`** is called from your server when the administrator pastes the sign-in address (sends the client id, the one-time code, the PKCE verifier, the redirect address and the API resource), and when the access token is due for renewal, including a weekly scheduled refresh (sends the client id, the refresh token and the API resource). No prompt or user content is sent.
+* **`GET https://auth.openai.com/.well-known/jwks.json`** is called from your server to fetch OpenAI's public keys and verify the ID token at sign-in. Nothing about your site or account is sent. The keys are cached for 24 hours.
+* **`POST https://auth.openai.com/api/accounts/oauth/revoke`** is called when the administrator clicks **Disconnect** or **Use a different ChatGPT account**, and once when the plugin is deleted while still connected (sends the client id and the refresh token). On deletion the call is best effort: if it fails, the plugin's data is removed anyway.
+* **`GET https://api.openai.com/v1/models`** is called with the access token to list the models your plan offers, usually at most once an hour (the list is cached on your site and fetched again after a sign-in, a disconnect or Clear cached model list) and from the diagnostics probe. No prompt or user content is sent.
+* **`POST https://api.openai.com/v1/responses`** is called whenever a plugin or theme on your site uses the AI Client with a ChatGPT model. The request carries the access token and what the calling code supplies: the prompt and conversation, system instructions, tool definitions, JSON schema, and any attached images or files.
 
 These services are provided by OpenAI. By connecting an account and using this provider you agree to OpenAI's terms:
 
 * Terms of Use: [https://openai.com/policies/terms-of-use/](https://openai.com/policies/terms-of-use/)
 * Privacy Policy: [https://openai.com/policies/privacy-policy/](https://openai.com/policies/privacy-policy/)
+* Sign in with ChatGPT: [https://developers.openai.com/siwc/token-sharing-open-source](https://developers.openai.com/siwc/token-sharing-open-source)
 
 == Screenshots ==
 
-1. ChatGPT registers as a first-class connector and appears in the WordPress AI connectors list, alongside the other providers.
-2. The ChatGPT connector wizard and built-in diagnostics — connect your account with a single command, then confirm the provider is live and that its models were discovered.
+1. ChatGPT registers as a connector and appears in the WordPress AI connectors list, alongside the other providers.
+2. The ChatGPT settings screen: sign in with ChatGPT, paste the address you landed on, then check the connection and its models in diagnostics.
 
 == Changelog ==
+
+= 1.0.0 =
+
+* Connect with Sign in with ChatGPT on a guided settings screen: no command line tool, no API key, billed to your ChatGPT Plus, Pro or Go plan.
+* Existing connections must sign in again after updating, and Free ChatGPT accounts are no longer eligible.
 
 = 0.1.4 =
 
@@ -115,9 +153,12 @@ These services are provided by OpenAI. By connecting an account and using this p
 * ChatGPT text generation models with dynamic model discovery.
 * Function calling and structured (JSON schema) output.
 * Encrypted token storage with automatic refresh.
-* Default-model selection under Settings → ChatGPT.
+* Default-model selection under Settings > ChatGPT.
 
 == Upgrade Notice ==
+
+= 1.0.0 =
+Connects with Sign in with ChatGPT. Existing connections must sign in again, and a ChatGPT Plus, Pro or Go plan is required.
 
 = 0.1.4 =
 Declares compatibility with WordPress 7.1.

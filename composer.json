@@ -2,7 +2,7 @@
     "name": "abdalsalaam/ai-provider-for-chatgpt",
     "description": "AI Provider for ChatGPT for the PHP AI Client SDK.",
     "license": "GPL-2.0-or-later",
-    "version": "0.1.4",
+    "version": "1.0.0",
     "keywords": [
         "ai",
         "chatgpt",
@@ -29,12 +29,14 @@
     "require-dev": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "phpstan/phpstan": "~2.1",
+        "phpunit/phpunit": "^9",
         "slevomat/coding-standard": "^8.20",
         "squizlabs/php_codesniffer": "^3.7",
         "szepeviktor/phpstan-wordpress": "^2.0",
         "woocommerce/woocommerce-sniffs": "*",
+        "wordpress/php-ai-client": "^0.4 || dev-trunk",
         "wp-coding-standards/wpcs": "*",
-        "wordpress/php-ai-client": "^0.4 || dev-trunk"
+        "yoast/phpunit-polyfills": "^2"
     },
     "suggest": {
         "wordpress/php-ai-client": "Required. The core PHP AI Client SDK that this provider extends."
@@ -55,7 +57,8 @@
         "platform": {
             "php": "7.4"
         },
-        "sort-packages": true
+        "sort-packages": true,
+        "prepend-autoloader": false
     },
     "archive": {
         "exclude": [
@@ -72,6 +75,7 @@
             ".phpcs.*.xml",
             ".phpcs.xml",
             "README.md",
+            "MANUAL_STEPS.md",
             "package.json",
             "package-lock.json",
             "composer.lock",
@@ -107,6 +111,9 @@
         "build": [
             "composer install --no-dev --optimize-autoloader",
             "composer archive --format=zip --file=ai-provider-for-chatgpt"
+        ],
+        "test": [
+            "npx wp-env run tests-cli --env-cwd=wp-content/plugins/ai-provider-for-chatgpt vendor/bin/phpunit"
         ]
     }
 }

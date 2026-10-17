@@ -7,8 +7,13 @@ function tick( ok: boolean ): string {
 	return ok ? '✓' : '✗';
 }
 
-export function Diagnostics() {
-	const { diagnostics, probe, refetch, runRemoteProbe } = useDiagnostics();
+type Props = {
+	statusKey?: string;
+};
+
+export function Diagnostics( { statusKey }: Props ) {
+	const { diagnostics, probe, refetch, runRemoteProbe } =
+		useDiagnostics( statusKey );
 
 	return (
 		<>
@@ -96,10 +101,7 @@ export function Diagnostics() {
 					disabled={ probe.loading }
 					onClick={ runRemoteProbe }
 				>
-					{ __(
-						'Probe ChatGPT /models directly',
-						'ai-provider-for-chatgpt'
-					) }
+					{ __( 'Probe OpenAI models', 'ai-provider-for-chatgpt' ) }
 				</Button>
 			</p>
 

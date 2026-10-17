@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: AI Provider for ChatGPT
+ * Plugin Name: AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed
  * Plugin URI: https://github.com/Abdalsalaam/ai-provider-for-chatgpt
- * Description: Registers OpenAI as a WordPress AI provider authenticated with a ChatGPT account (Free/Plus/Pro) instead of an API key. Usage is billed against the connected ChatGPT subscription.
+ * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9
  * Requires PHP: 7.4
- * Version: 0.1.4
+ * Version: 1.0.0
  * Author: Abdalsalaam Halawa
  * Author URI: https://halawa.io
  * License: GPL-2.0-or-later
@@ -23,8 +23,10 @@ use WordPress\AiClient\AiClient;
 use WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication;
 use Halawa\ChatGptAiProvider\Admin\Assets;
 use Halawa\ChatGptAiProvider\Admin\SettingsPage;
+use Halawa\ChatGptAiProvider\Admin\Upgrade;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\Cache\TransientCache;
+use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 use Halawa\ChatGptAiProvider\Rest\CacheController;
 use Halawa\ChatGptAiProvider\Rest\ConnectionController;
@@ -37,72 +39,91 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/vendor/autoload.php';
 
 /**
- * Default OAuth client_id used for the refresh_token grant.
+ * Plugin version, also used in the User-Agent header.
  *
- * This is the Codex CLI public client — the only client OpenAI's OAuth
- * allowlist accepts for ChatGPT-account refresh exchanges. It ships openly
- * in the Codex CLI source, so embedding it here is fine.
- *
- * @since 0.1.0
+ * @since 1.0.0
  */
-const DEFAULT_OAUTH_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const VERSION = '1.0.0';
 
 /**
- * Codex CLI client version reported on every Codex backend request.
+ * Sign in with ChatGPT endpoints and identifiers (OpenAI open-source app flow).
  *
- * The backend gates which model set, capabilities, and tool types a client
- * is allowed to see by inspecting this value (both as the `client_version`
- * query string on `/models` and as the User-Agent prefix on `/responses`).
- * Bumping it surfaces newer models (e.g. gpt-5.5) that older client versions
- * are not entitled to. Override via the
- * `halawa_chatgpt_codex_client_version` filter.
- *
- * @since 0.1.0
+ * @since 1.0.0
  */
-const DEFAULT_CODEX_CLIENT_VERSION = '0.133.0';
+const AUTHORIZE_ENDPOINT   = 'https://auth.openai.com/api/accounts/authorize';
+const TOKEN_ENDPOINT       = 'https://auth.openai.com/api/accounts/oauth/token';
+const REVOKE_ENDPOINT      = 'https://auth.openai.com/api/accounts/oauth/revoke';
+const JWKS_URI             = 'https://auth.openai.com/.well-known/jwks.json';
+const ISSUER               = 'https://auth.openai.com';
+const RESOURCE             = 'https://api.openai.com/v1';
+const API_BASE_URL         = 'https://api.openai.com/v1';
+const SCOPES               = 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct';
+const PLAN_SCOPE           = 'chatgpt.tokens.use.direct';
+const AGENT_NAME           = 'AI Provider for ChatGPT';
+const DYNAMIC_CLIENT_ID    = 'dynamic_agent_client';
+const DEFAULT_REDIRECT_URI = 'http://127.0.0.1:1455/auth/callback';
+const USAGE_URL            = 'https://chatgpt.com/settings/usage';
 
 /**
- * Returns the Codex CLI client version the plugin should impersonate.
+ * Returns the redirect URI sent on authorize and code exchange.
  *
- * @since 0.1.0
+ * @since 1.0.0
  *
- * @return string The client version (e.g. "0.65.0").
+ * @return string The redirect URI.
  */
-function codex_client_version(): string {
+function redirect_uri(): string {
 	/**
-	 * Filters the Codex CLI client version the plugin impersonates.
+	 * Filters the OAuth redirect URI, for a registered https client.
 	 *
-	 * The Codex backend gates the visible model set, capability flags, and
-	 * tool types behind this value. Override it on a site to opt into newer
-	 * models without waiting for a plugin release.
+	 * @since 1.0.0
 	 *
-	 * @since 0.1.0
-	 *
-	 * @param string $version Default client version (e.g. "0.65.0").
+	 * @param string $uri Default loopback redirect URI.
 	 */
-	$value = apply_filters( 'halawa_chatgpt_codex_client_version', DEFAULT_CODEX_CLIENT_VERSION );
-	return is_string( $value ) && '' !== $value ? $value : DEFAULT_CODEX_CLIENT_VERSION;
+	$value = apply_filters( 'halawa_chatgpt_redirect_uri', DEFAULT_REDIRECT_URI );
+	return is_string( $value ) && '' !== $value ? $value : DEFAULT_REDIRECT_URI;
 }
 
 /**
- * Returns the OAuth client_id used for the refresh_token grant.
+ * Returns the client id from the CHATGPT_OAUTH_CLIENT_ID constant, if set.
  *
- * Defaults to the Codex CLI public client; sites that want to refresh
- * against a different OAuth client can override by defining the
- * `CHATGPT_OAUTH_CLIENT_ID` constant in wp-config.php.
+ * @since 1.0.0
  *
- * @since 0.1.0
- *
- * @return string The OAuth client_id.
+ * @return string|null The configured client id, or null.
  */
-function oauth_client_id(): string {
-	if ( defined( 'CHATGPT_OAUTH_CLIENT_ID' ) ) {
-		$value = constant( 'CHATGPT_OAUTH_CLIENT_ID' );
-		if ( is_string( $value ) && '' !== $value ) {
-			return $value;
-		}
+function configured_client_id(): ?string {
+	if ( ! defined( 'CHATGPT_OAUTH_CLIENT_ID' ) ) {
+		return null;
 	}
-	return DEFAULT_OAUTH_CLIENT_ID;
+	$value = constant( 'CHATGPT_OAUTH_CLIENT_ID' );
+	return is_string( $value ) && '' !== $value ? $value : null;
+}
+
+/**
+ * Returns the stable ext_agent_host_id for this site.
+ *
+ * @since 1.0.0
+ *
+ * @return string The host id, "urn:uuid:" plus the installation uuid.
+ */
+function host_id(): string {
+	$id = get_option( 'halawa_chatgpt_installation_id', '' );
+	if ( ! is_string( $id ) || '' === $id ) {
+		// add_option() keeps an id another request wrote first.
+		add_option( 'halawa_chatgpt_installation_id', wp_generate_uuid4(), '', false );
+		$id = (string) get_option( 'halawa_chatgpt_installation_id', '' );
+	}
+	return 'urn:uuid:' . $id;
+}
+
+/**
+ * Returns the User-Agent sent to OpenAI.
+ *
+ * @since 1.0.0
+ *
+ * @return string The User-Agent header value.
+ */
+function user_agent(): string {
+	return 'ai-provider-for-chatgpt/' . VERSION . ' (WordPress/' . get_bloginfo( 'version' ) . ')';
 }
 
 /**
@@ -124,7 +145,7 @@ function register_provider(): void {
 
 	// Wire a transient-backed PSR-16 cache so the SDK's `/models` lookup is
 	// persisted across requests. Without this the SDK falls back to a
-	// per-request in-memory array, which means the Codex /models endpoint
+	// per-request in-memory array, which means the /models endpoint
 	// is hit on every admin page load. Idempotent if called more than once.
 	if ( null === AiClient::getCache() ) {
 		AiClient::setCache( new TransientCache() );
@@ -176,7 +197,37 @@ function register_rest_controllers(): void {
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_controllers' );
 
+add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' ) );
+
+/**
+ * Schedules the weekly refresh when a live connection already exists.
+ *
+ * @since 1.0.0
+ *
+ * @return void
+ */
+function activate(): void {
+	if ( ( new TokenStore() )->is_connected() ) {
+		TokenRefresher::schedule();
+	}
+}
+
+/**
+ * Removes the weekly refresh; the connection itself is kept.
+ *
+ * @since 1.0.0
+ *
+ * @return void
+ */
+function deactivate(): void {
+	TokenRefresher::unschedule();
+}
+
+register_activation_hook( __FILE__, __NAMESPACE__ . '\\activate' );
+register_deactivation_hook( __FILE__, __NAMESPACE__ . '\\deactivate' );
+
 if ( is_admin() ) {
 	( new SettingsPage() )->register();
 	( new Assets() )->register();
+	( new Upgrade() )->register();
 }

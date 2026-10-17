@@ -3,3 +3,5 @@
 /node_modules/
 /build/
 /ai-provider-for-chatgpt.zip
+/.plans/
+/.phpunit.result.cache

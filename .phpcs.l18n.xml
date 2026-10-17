@@ -18,6 +18,14 @@
 				<element value="halawa_chatgpt"/>
 				<element value="Halawa\ChatGptAiProvider"/>
 			</property>
+			<property name="custom_test_classes" type="array">
+				<element value="Test_Case"/>
+			</property>
 		</properties>
+	</rule>
+
+	<!-- Test helper classes live only in the test suite and never load in WordPress. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound">
+		<exclude-pattern>tests/phpunit/includes/</exclude-pattern>
 	</rule>
 </ruleset>

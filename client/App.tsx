@@ -17,6 +17,7 @@ import { useConnection } from './hooks/useConnection';
 import { errorMessage } from './utils';
 import { ChatGptIcon } from './components/ChatGptIcon';
 import { ConnectionCard } from './components/ConnectionCard';
+import { ConnectScreen } from './components/ConnectScreen';
 import { Diagnostics } from './components/Diagnostics';
 import { NoticesArea } from './components/NoticesArea';
 
@@ -28,24 +29,10 @@ export function App() {
 	const [ clearingCache, setClearingCache ] = useState( false );
 
 	const isConnected = !! data?.connected;
-
-	const runDisconnect = async () => {
-		try {
-			const next = await api.disconnect();
-			apply( next );
-			void dispatch( noticesStore ).createSuccessNotice(
-				__( 'Local token bundle removed.', 'ai-provider-for-chatgpt' ),
-				{ type: 'snackbar' }
-			);
-		} catch ( err ) {
-			void dispatch( noticesStore ).createErrorNotice(
-				errorMessage( err ),
-				{
-					type: 'snackbar',
-				}
-			);
-		}
-	};
+	// Changes whenever a connect, disconnect, forget or refresh changes the status.
+	const statusKey = data
+		? [ data.connected, data.client_id, data.last_refresh ].join( '|' )
+		: undefined;
 
 	const runClearCache = async () => {
 		setClearingCache( true );
@@ -97,13 +84,6 @@ export function App() {
 								'ai-provider-for-chatgpt'
 							) }
 						</MenuItem>
-						<MenuItem
-							isDestructive
-							disabled={ ! isConnected }
-							onClick={ runDisconnect }
-						>
-							{ __( 'Disconnect', 'ai-provider-for-chatgpt' ) }
-						</MenuItem>
 					</MenuGroup>
 				) }
 			</DropdownMenu>
@@ -139,17 +119,6 @@ export function App() {
 						</Notice.Root>
 					) }
 
-					{ data && ! isConnected && (
-						<Notice.Root intent="warning">
-							<Notice.Description>
-								{ __(
-									'No ChatGPT credentials imported yet. Connect below to enable the provider.',
-									'ai-provider-for-chatgpt'
-								) }
-							</Notice.Description>
-						</Notice.Root>
-					) }
-
 					{ data && (
 						<Card.Root>
 							<Card.Header>
@@ -160,13 +129,24 @@ export function App() {
 												'ai-provider-for-chatgpt'
 										  )
 										: __(
-												'Connect ChatGPT',
+												'Connect your ChatGPT account',
 												'ai-provider-for-chatgpt'
 										  ) }
 								</Card.Title>
 							</Card.Header>
 							<Card.Content>
-								<ConnectionCard data={ data } apply={ apply } />
+								{ isConnected ? (
+									<ConnectionCard
+										data={ data }
+										apply={ apply }
+										refetch={ refetch }
+									/>
+								) : (
+									<ConnectScreen
+										status={ data }
+										onConnected={ apply }
+									/>
+								) }
 							</Card.Content>
 						</Card.Root>
 					) }
@@ -181,7 +161,7 @@ export function App() {
 							</Card.Title>
 						</Card.Header>
 						<Card.Content>
-							<Diagnostics />
+							<Diagnostics statusKey={ statusKey } />
 						</Card.Content>
 					</Card.Root>
 				</Stack>

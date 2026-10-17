@@ -16,49 +16,59 @@ use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
 use WordPress\AiClient\AiClient;
-use Halawa\ChatGptAiProvider\Authentication\AuthJsonImporter;
-use Halawa\ChatGptAiProvider\Authentication\PairingTokenStore;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
-use Halawa\ChatGptAiProvider\OAuth\IdTokenClaims;
+use Halawa\ChatGptAiProvider\Cache\TransientCache;
+use Halawa\ChatGptAiProvider\OAuth\CallbackUrl;
+use Halawa\ChatGptAiProvider\OAuth\OAuthException;
+use Halawa\ChatGptAiProvider\OAuth\SignInFlow;
+use Halawa\ChatGptAiProvider\OAuth\TokenEndpoint;
 use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 
-use function Halawa\ChatGptAiProvider\oauth_client_id;
+use function Halawa\ChatGptAiProvider\redirect_uri;
+
+use const Halawa\ChatGptAiProvider\USAGE_URL;
 
 /**
- * REST controller backing the React Settings → ChatGPT screen.
- *
- * Exposes the connection state and the three mutating actions the UI offers:
- * import, refresh, and disconnect.
+ * REST controller backing the Settings > ChatGPT screen.
  *
  * @since 0.1.0
  */
 class ConnectionController extends WP_REST_Controller {
 
 	/**
-	 * Persistent token storage.
+	 * Token storage.
 	 *
 	 * @var TokenStore
 	 */
 	private $store;
 
 	/**
-	 * Short-lived pairing tokens issued for the companion CLI.
+	 * Sign-in flow.
 	 *
-	 * @var PairingTokenStore
+	 * @var SignInFlow
 	 */
-	private $pairings;
+	private $flow;
+
+	/**
+	 * Token endpoint client, used for revocation.
+	 *
+	 * @var TokenEndpoint
+	 */
+	private $endpoint;
 
 	/**
 	 * Constructor.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param TokenStore             $store    Persistent token storage.
-	 * @param PairingTokenStore|null $pairings Optional pairing-token store (testing seam).
+	 * @param TokenStore         $store    Token storage.
+	 * @param SignInFlow|null    $flow     Sign-in flow.
+	 * @param TokenEndpoint|null $endpoint Token endpoint client.
 	 */
-	public function __construct( TokenStore $store, ?PairingTokenStore $pairings = null ) {
+	public function __construct( TokenStore $store, ?SignInFlow $flow = null, ?TokenEndpoint $endpoint = null ) {
 		$this->store     = $store;
-		$this->pairings  = $pairings ?? new PairingTokenStore();
+		$this->endpoint  = $endpoint ?? new TokenEndpoint();
+		$this->flow      = $flow ?? new SignInFlow( $store, $this->endpoint );
 		$this->namespace = 'ai-provider-for-chatgpt/v1';
 		$this->rest_base = 'connection';
 	}
@@ -81,34 +91,56 @@ class ConnectionController extends WP_REST_Controller {
 					'permission_callback' => array( $this, 'permissions' ),
 				),
 				array(
-					'methods'             => WP_REST_Server::CREATABLE,
-					'callback'            => array( $this, 'import' ),
+					'methods'             => WP_REST_Server::DELETABLE,
+					'callback'            => array( $this, 'disconnect' ),
 					'permission_callback' => array( $this, 'permissions' ),
 					'args'                => array(
-						'bundle' => array(
-							'type'              => 'string',
-							'required'          => true,
-							// The bundle is a raw JSON document; structure and field
-							// validation are enforced downstream by AuthJsonImporter
-							// (json_decode + per-field type checks). We only un-slash
-							// the magic-quoted POST body here and reject non-strings.
-							'sanitize_callback' => static function ( $value ) {
-								return is_string( $value ) ? wp_unslash( $value ) : '';
-							},
-							'validate_callback' => static function ( $value ) {
-								return is_string( $value ) && '' !== trim( $value );
-							},
+						'forget' => array(
+							'type'    => 'boolean',
+							'default' => false,
 						),
 					),
 				),
+			)
+		);
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/sign-in',
+			array(
 				array(
-					'methods'             => WP_REST_Server::DELETABLE,
-					'callback'            => array( $this, 'disconnect' ),
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'sign_in' ),
 					'permission_callback' => array( $this, 'permissions' ),
 				),
 			)
 		);
-
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/callback',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'callback' ),
+					'permission_callback' => array( $this, 'permissions' ),
+					'args'                => array(
+						'callback_url' => array(
+							'type'              => 'string',
+							'required'          => true,
+							// Structure is checked in CallbackUrl; here only trim and un-slash.
+							'sanitize_callback' => static function ( $value ) {
+								return is_string( $value ) ? trim( wp_unslash( $value ) ) : '';
+							},
+							// Only size and emptiness here, so CallbackUrl can explain a wrong paste.
+							'validate_callback' => static function ( $value ) {
+								return is_string( $value )
+									&& strlen( $value ) <= CallbackUrl::MAX_LENGTH
+									&& '' !== trim( $value );
+							},
+						),
+					),
+				),
+			)
+		);
 		register_rest_route(
 			$this->namespace,
 			'/' . $this->rest_base . '/refresh',
@@ -120,69 +152,10 @@ class ConnectionController extends WP_REST_Controller {
 				),
 			)
 		);
-
-		register_rest_route(
-			$this->namespace,
-			'/' . $this->rest_base . '/pairing',
-			array(
-				array(
-					'methods'             => WP_REST_Server::CREATABLE,
-					'callback'            => array( $this, 'issue_pairing' ),
-					'permission_callback' => array( $this, 'permissions' ),
-				),
-			)
-		);
-
-		/*
-		 * Intentionally public endpoint (permission_callback => __return_true).
-		 *
-		 * The companion CLI that posts here holds no WordPress login cookie and
-		 * cannot pass current_user_can(). The security boundary is instead the
-		 * one-time, single-use 256-bit pairing token in the request body: it is
-		 * format-validated by the `token` validate_callback (64 hex chars) and
-		 * consumed atomically in redeem_pairing() before any credential is
-		 * stored. As a secondary, non-authorization safeguard, redeem_pairing()
-		 * also applies a per-IP rate limit to blunt DoS / brute-force attempts.
-		 */
-		register_rest_route(
-			$this->namespace,
-			'/' . $this->rest_base . '/pair',
-			array(
-				array(
-					'methods'             => WP_REST_Server::CREATABLE,
-					'callback'            => array( $this, 'redeem_pairing' ),
-					'permission_callback' => '__return_true',
-					'args'                => array(
-						'token'  => array(
-							'type'              => 'string',
-							'required'          => true,
-							'sanitize_callback' => static function ( $value ) {
-								return is_string( $value ) ? trim( wp_unslash( $value ) ) : '';
-							},
-							'validate_callback' => static function ( $value ) {
-								return is_string( $value ) && preg_match( '/^[a-f0-9]{64}$/', $value ) === 1;
-							},
-						),
-						'bundle' => array(
-							'type'              => 'string',
-							'required'          => true,
-							// Same rationale as /connection POST: AuthJsonImporter parses
-							// and validates the JSON; we only un-slash.
-							'sanitize_callback' => static function ( $value ) {
-								return is_string( $value ) ? wp_unslash( $value ) : '';
-							},
-							'validate_callback' => static function ( $value ) {
-								return is_string( $value ) && '' !== trim( $value );
-							},
-						),
-					),
-				),
-			)
-		);
 	}
 
 	/**
-	 * Capability check for every route in this controller.
+	 * Capability check for every route.
 	 *
 	 * @since 0.1.0
 	 *
@@ -200,115 +173,57 @@ class ConnectionController extends WP_REST_Controller {
 	}
 
 	/**
-	 * Per-IP rate limiter for the public pairing-redeem endpoint.
-	 *
-	 * This is a secondary DoS / brute-force safeguard, NOT the authorization
-	 * gate — the security boundary is the single-use token validated and
-	 * consumed in redeem_pairing(). It is invoked from that callback (the route
-	 * itself is intentionally public) rather than wired as a permission_callback,
-	 * because a rate limiter does not express authorization intent.
-	 *
-	 * A simple sliding-window counter backed by a transient. The cap is
-	 * intentionally generous so the legitimate CLI retry path is never affected.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return bool|WP_Error True when the request may proceed, WP_Error otherwise.
-	 */
-	private function pair_rate_limit() {
-		$ip = $this->client_ip();
-		if ( '' === $ip ) {
-			return true;
-		}
-		/**
-		 * Filters the per-IP attempt cap for redeeming pairing tokens.
-		 *
-		 * @since 0.1.0
-		 *
-		 * @param int $max_attempts Maximum redemption attempts per minute. Default 10.
-		 */
-		$max_attempts = (int) apply_filters( 'halawa_chatgpt_pair_rate_limit', 10 );
-		if ( $max_attempts <= 0 ) {
-			return true;
-		}
-		$key     = 'halawa_chatgpt_pair_rl_' . hash( 'sha256', $ip );
-		$current = (int) get_transient( $key );
-		if ( $current >= $max_attempts ) {
-			return new WP_Error(
-				'rate_limited',
-				__( 'Too many pairing attempts. Please wait a minute and try again.', 'ai-provider-for-chatgpt' ),
-				array( 'status' => 429 )
-			);
-		}
-		set_transient( $key, $current + 1, MINUTE_IN_SECONDS );
-		return true;
-	}
-
-	/**
-	 * Returns the requesting IP, preferring the immediate REMOTE_ADDR.
-	 *
-	 * Proxy headers (X-Forwarded-For, etc.) are intentionally ignored to avoid
-	 * trivial spoofing of the rate-limit bucket.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return string The IP, or the empty string when unavailable.
-	 */
-	private function client_ip(): string {
-		$remote = isset( $_SERVER['REMOTE_ADDR'] )
-			? sanitize_text_field( (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
-			: '';
-		$remote = filter_var( $remote, FILTER_VALIDATE_IP );
-		return false === $remote ? '' : (string) $remote;
-	}
-
-	/**
-	 * GET /connection — returns the current connection state.
+	 * GET /connection: returns the status and consumes the first sign-in notice.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @return WP_REST_Response
 	 */
 	public function get_status(): WP_REST_Response {
-		return new WP_REST_Response( $this->build_status_payload(), 200 );
+		$show_notice = (bool) get_option( SignInFlow::FIRST_NOTICE_OPTION, false );
+		if ( $show_notice ) {
+			delete_option( SignInFlow::FIRST_NOTICE_OPTION );
+		}
+		return new WP_REST_Response( $this->status( $show_notice ), 200 );
 	}
 
 	/**
-	 * POST /connection — imports a Codex auth.json bundle.
+	 * POST /connection/sign-in: starts a sign-in attempt.
 	 *
-	 * @since 0.1.0
+	 * @since 1.0.0
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function sign_in() {
+		try {
+			return new WP_REST_Response( $this->flow->start( get_current_user_id() ), 200 );
+		} catch ( Throwable $e ) {
+			return $this->error( $e );
+		}
+	}
+
+	/**
+	 * POST /connection/callback: completes the sign-in from the pasted address.
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function import( WP_REST_Request $request ) {
-		$bundle = (string) $request->get_param( 'bundle' );
+	public function callback( WP_REST_Request $request ) {
 		try {
-			( new AuthJsonImporter( $this->store ) )->import( $bundle );
+			$this->flow->complete( get_current_user_id(), (string) $request->get_param( 'callback_url' ) );
 		} catch ( Throwable $e ) {
-			return new WP_Error(
-				'import_failed',
-				$e->getMessage(),
-				array( 'status' => 400 )
-			);
+			return $this->error( $e );
 		}
-		return new WP_REST_Response( $this->build_status_payload(), 200 );
+		$this->clear_model_cache();
+		return new WP_REST_Response( $this->status( true ), 200 );
 	}
 
 	/**
-	 * DELETE /connection — clears the stored token bundle.
+	 * POST /connection/refresh: rotates the tokens now.
 	 *
-	 * @since 0.1.0
-	 *
-	 * @return WP_REST_Response
-	 */
-	public function disconnect(): WP_REST_Response {
-		$this->store->clear();
-		return new WP_REST_Response( $this->build_status_payload(), 200 );
-	}
-
-	/**
-	 * POST /connection/refresh — exchanges the refresh token for a new bundle.
+	 * Answers 409 refresh_in_progress when another request holds the refresh lock.
 	 *
 	 * @since 0.1.0
 	 *
@@ -316,140 +231,102 @@ class ConnectionController extends WP_REST_Controller {
 	 */
 	public function refresh() {
 		try {
-			( new TokenRefresher( $this->store ) )->refresh();
+			$result = ( new TokenRefresher( $this->store, $this->endpoint ) )->refresh();
 		} catch ( Throwable $e ) {
-			return new WP_Error(
-				'refresh_failed',
-				$e->getMessage(),
-				array( 'status' => 502 )
-			);
+			return $this->error( $e );
 		}
+		if ( TokenRefresher::BUSY === $result ) {
+			return $this->error( new OAuthException( 'refresh_in_progress', 'ChatGPT tokens are being refreshed by another request. Try again in a moment.' ) );
+		}
+		wp_cache_delete( TokenStore::OPTION_NAME, 'options' );
 		return new WP_REST_Response(
-			array_merge(
-				$this->build_status_payload(),
-				array( 'refreshed_at' => $this->store->get_last_refresh_timestamp() )
-			),
+			array_merge( $this->status( false ), array( 'refreshed_at' => $this->store->get_last_refresh_timestamp() ) ),
 			200
 		);
 	}
 
 	/**
-	 * POST /connection/pairing — issues a one-time pairing token for the CLI.
+	 * DELETE /connection: revokes the refresh token and signs out.
 	 *
-	 * @since 0.1.0
-	 *
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function issue_pairing() {
-		try {
-			$issued = $this->pairings->issue();
-		} catch ( Throwable $e ) {
-			return new WP_Error(
-				'pairing_issue_failed',
-				__( 'Could not generate a pairing token. The system CSPRNG may be unavailable.', 'ai-provider-for-chatgpt' ),
-				array( 'status' => 500 )
-			);
-		}
-		return new WP_REST_Response(
-			array(
-				'token'      => $issued['token'],
-				'expires_at' => $issued['expires_at'],
-				'site_url'   => home_url(),
-				'rest_url'   => rest_url( $this->namespace . '/' . $this->rest_base . '/pair' ),
-			),
-			200
-		);
-	}
-
-	/**
-	 * POST /connection/pair — redeems a pairing token by storing the OAuth bundle.
-	 *
-	 * Public route; the security boundary is the unguessable single-use token.
-	 * A per-IP rate limit is applied first as a secondary DoS / brute-force
-	 * safeguard before the token is consumed.
+	 * The registration (issued client id and account) is kept for the next
+	 * sign-in unless forget is true, which removes it for a different account.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @param WP_REST_Request $request The request.
-	 * @return WP_REST_Response|WP_Error
+	 * @return WP_REST_Response
 	 */
-	public function redeem_pairing( WP_REST_Request $request ) {
-		$rate_limit = $this->pair_rate_limit();
-		if ( is_wp_error( $rate_limit ) ) {
-			return $rate_limit;
+	public function disconnect( WP_REST_Request $request ): WP_REST_Response {
+		$revoked       = false;
+		$refresh_token = $this->store->get_refresh_token();
+		$client_id     = $this->store->get_client_id();
+		if ( null !== $refresh_token && null !== $client_id ) {
+			$revoked = $this->endpoint->revoke( $client_id, $refresh_token );
 		}
 
-		$token  = (string) $request->get_param( 'token' );
-		$bundle = (string) $request->get_param( 'bundle' );
-
-		if ( ! $this->pairings->consume( $token ) ) {
-			return new WP_Error(
-				'invalid_pairing_token',
-				__( 'The pairing token is invalid, expired, or already used.', 'ai-provider-for-chatgpt' ),
-				array( 'status' => 403 )
-			);
+		if ( true === $request->get_param( 'forget' ) ) {
+			$this->store->clear();
+		} else {
+			$this->store->sign_out();
 		}
+		delete_option( SignInFlow::FIRST_NOTICE_OPTION );
+		delete_transient( SignInFlow::pending_key( get_current_user_id() ) );
+		$this->clear_model_cache();
 
-		try {
-			( new AuthJsonImporter( $this->store ) )->import( $bundle );
-		} catch ( Throwable $e ) {
-			// The token has already been spent; surface a generic error rather
-			// than echoing parser internals (which could include slices of the
-			// caller's bundle) to an unauthenticated client.
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Diagnostic under WP_DEBUG only.
-				error_log( 'ai-provider-for-chatgpt: pairing import failed: ' . $e->getMessage() );
-			}
-			return new WP_Error(
-				'pairing_import_failed',
-				__( 'The pairing bundle could not be imported.', 'ai-provider-for-chatgpt' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		/**
-		 * Fires after a successful CLI pairing redemption.
-		 *
-		 * Sites can hook this to write an audit-log entry, send a notification,
-		 * or invalidate any session that should not survive a re-pair.
-		 *
-		 * @since 0.1.0
-		 */
-		do_action( 'halawa_chatgpt_paired' );
-
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Diagnostic under WP_DEBUG only.
-			error_log( 'ai-provider-for-chatgpt: pairing succeeded.' );
-		}
-
-		return new WP_REST_Response( array( 'paired' => true ), 200 );
+		return new WP_REST_Response( array_merge( $this->status( false ), array( 'revoked' => $revoked ) ), 200 );
 	}
 
 	/**
-	 * Builds the shared status payload used by every route in this controller.
+	 * Maps an exception to a WP_Error.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param Throwable $e The exception.
+	 * @return WP_Error
+	 */
+	private function error( Throwable $e ): WP_Error {
+		if ( $e instanceof OAuthException ) {
+			$statuses = array(
+				'no_pending'          => 409,
+				'refresh_in_progress' => 409,
+				'plan_not_enabled'    => 403,
+			);
+			return new WP_Error( $e->getErrorCode(), $e->getMessage(), array( 'status' => $statuses[ $e->getErrorCode() ] ?? 400 ) );
+		}
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Diagnostic under WP_DEBUG only.
+			error_log( 'ai-provider-for-chatgpt: connection route failed: ' . get_class( $e ) . ': ' . $e->getMessage() );
+		}
+		return new WP_Error(
+			'unexpected_error',
+			__( 'Unexpected error, check the debug log', 'ai-provider-for-chatgpt' ),
+			array( 'status' => 500 )
+		);
+	}
+
+	/**
+	 * Clears the SDK model cache so the model list follows the connection.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return void
+	 */
+	private function clear_model_cache(): void {
+		( new TransientCache() )->clear();
+	}
+
+	/**
+	 * Builds the status payload shared by every route.
 	 *
 	 * @since 0.1.0
 	 *
+	 * @param bool $show_notice Value of show_first_signin_notice.
 	 * @return array<string, mixed>
 	 */
-	private function build_status_payload(): array {
-		$data       = $this->store->get();
-		$connected  = false;
-		$email      = null;
-		$plan       = null;
-		$account_id = null;
-		$is_fedramp = false;
-		$id_expired = false;
-
-		if ( null !== $data ) {
-			$id_token   = $data['tokens']['id_token'];
-			$connected  = '' !== ( $data['tokens']['access_token'] ?? '' );
-			$email      = IdTokenClaims::email( $id_token );
-			$plan       = IdTokenClaims::plan_type( $id_token );
-			$account_id = $data['tokens']['account_id'];
-			$is_fedramp = IdTokenClaims::is_fedramp( $id_token );
-			$id_expired = IdTokenClaims::is_expired( $id_token );
-		}
+	private function status( bool $show_notice ): array {
+		$needs_signin = $this->store->needs_signin();
+		$expires_at   = $this->store->get_expires_at();
+		$last_refresh = $this->store->get_last_refresh_timestamp();
 
 		$has_registered = false;
 		$is_configured  = false;
@@ -465,17 +342,20 @@ class ConnectionController extends WP_REST_Controller {
 		}
 
 		return array(
-			'connected'        => $connected,
-			'email'            => $email,
-			'account_id'       => $account_id,
-			'plan_type'        => $plan,
-			'is_fedramp'       => $is_fedramp,
-			'id_token_expired' => $id_expired,
-			'last_refresh'     => 0 !== $this->store->get_last_refresh_timestamp()
-				? $this->store->get_last_refresh_timestamp()
-				: null,
-			'oauth_client_id'  => oauth_client_id(),
-			'provider'         => array(
+			'connected'                => $this->store->is_connected(),
+			'needs_signin'             => $needs_signin,
+			'email'                    => $this->store->get_email(),
+			'name'                     => $this->store->get_name(),
+			'subject'                  => $this->store->get_subject(),
+			'client_id'                => $this->store->get_client_id(),
+			'scopes'                   => $this->store->get_scopes(),
+			'plan_usage_enabled'       => $this->store->has_plan_scope(),
+			'expires_at'               => 0 !== $expires_at ? $expires_at : null,
+			'last_refresh'             => 0 !== $last_refresh ? $last_refresh : null,
+			'show_first_signin_notice' => $show_notice,
+			'redirect_uri'             => redirect_uri(),
+			'usage_url'                => USAGE_URL,
+			'provider'                 => array(
 				'registered' => $has_registered,
 				'configured' => $is_configured,
 			),

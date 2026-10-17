@@ -24,3 +24,4 @@
 # Exclude distribution artifacts.
 /ai-provider-for-chatgpt.zip export-ignore
 /README.md export-ignore
+/MANUAL_STEPS.md export-ignore

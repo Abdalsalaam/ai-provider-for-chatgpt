@@ -10,40 +10,20 @@ declare(strict_types=1);
 namespace Halawa\ChatGptAiProvider\Authentication;
 
 use WordPress\AiClient\Common\Exception\RuntimeException;
+use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
+
+use const Halawa\ChatGptAiProvider\PLAN_SCOPE;
 
 /**
- * Persists OAuth tokens in a single WordPress option, encrypted at rest.
+ * Persists the Sign in with ChatGPT record in one option, encrypted at rest.
  *
  * Encryption uses libsodium with a 32-byte key derived from WordPress's
  * `AUTH_KEY` + `LOGGED_IN_KEY` salts, so a SQL dump alone is insufficient
- * to recover the access/refresh tokens.
- *
- * Schema (after decryption):
- *
- * ```php
- * [
- *     'tokens' => [
- *         'id_token'      => string,
- *         'access_token'  => string,
- *         'refresh_token' => string,
- *         'account_id'    => string,
- *     ],
- *     'last_refresh' => string, // ISO-8601
- * ]
- * ```
+ * to recover the tokens. The plaintext is the version 2 record: client_id,
+ * ext_agent_host_id, subject, email, name, scopes, the three tokens,
+ * expires_at, earliest_refresh_at, last_refresh and needs_signin.
  *
  * @since 0.1.0
- *
- * @phpstan-type TokenSet array{
- *     id_token: string,
- *     access_token: string,
- *     refresh_token: string,
- *     account_id: string
- * }
- * @phpstan-type StoredData array{
- *     tokens: TokenSet,
- *     last_refresh: string
- * }
  */
 class TokenStore {
 
@@ -67,66 +47,137 @@ class TokenStore {
 	 */
 	public const CORE_API_KEY_PLACEHOLDER = 'chatgpt-account-managed';
 
+	public const RECORD_VERSION = 2;
+
 	/**
-	 * Returns the decrypted token bundle, or null when none is stored.
+	 * Fields kept after sign-out so the next sign-in reuses the registration.
+	 */
+	public const REGISTRATION_FIELDS = array( 'client_id', 'ext_agent_host_id', 'subject', 'email', 'name' );
+
+	/**
+	 * Returns the version 2 record, or null when absent or not version 2.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @return StoredData|null The token bundle, or null.
+	 * @return array<string, mixed>|null The record.
 	 */
 	public function get(): ?array {
-		$raw = get_option( self::OPTION_NAME, '' );
-		if ( ! is_string( $raw ) || '' === $raw ) {
+		$data = $this->decode();
+		if ( null === $data || self::RECORD_VERSION !== ( $data['version'] ?? null ) ) {
 			return null;
 		}
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding the ciphertext envelope we encoded with base64_encode() in save(); not obfuscation.
-		$decoded = base64_decode( $raw, true );
-		if ( false === $decoded || strlen( $decoded ) < SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1 ) {
-			return null;
-		}
-		$nonce  = substr( $decoded, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-		$cipher = substr( $decoded, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-		$plain  = sodium_crypto_secretbox_open( $cipher, $nonce, $this->key() );
-		if ( false === $plain ) {
-			return null;
-		}
-		$data = json_decode( $plain, true );
-		if ( ! is_array( $data ) || ! isset( $data['tokens'] ) || ! is_array( $data['tokens'] ) ) {
-			return null;
-		}
-		/**
-		 * Decoded stored token bundle.
-		 *
-		 * @var StoredData $data
-		 */
 		return $data;
 	}
 
 	/**
-	 * Encrypts and persists the given token bundle.
+	 * Returns true when the option holds something that is not a v2 record.
 	 *
-	 * @since 0.1.0
+	 * @since 1.0.0
 	 *
-	 * @param array $tokens The token set returned by the OAuth token endpoint.
-	 * @phpstan-param TokenSet $tokens
-	 * @return void
+	 * @return bool True for a legacy or unreadable record.
 	 */
-	public function save( array $tokens ): void {
-		$payload = array(
-			'tokens'       => $tokens,
-			'last_refresh' => gmdate( 'c' ),
-		);
-		$json    = (string) wp_json_encode( $payload );
-		$nonce   = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
-		$cipher  = sodium_crypto_secretbox( $json, $nonce, $this->key() );
-		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding nonce+ciphertext as text for option storage; not obfuscation.
-		update_option( self::OPTION_NAME, base64_encode( $nonce . $cipher ), false );
-		// Flag the connector as configured for WP core's Settings → Connectors UI.
-		update_option( self::CORE_API_KEY_OPTION, self::CORE_API_KEY_PLACEHOLDER, false );
+	public function has_legacy_record(): bool {
+		$raw = get_option( self::OPTION_NAME, '' );
+		return is_string( $raw ) && '' !== $raw && null === $this->get();
 	}
 
 	/**
-	 * Removes any stored token bundle.
+	 * Saves a full record, stamping the version and last_refresh.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, mixed> $record The record.
+	 * @return void
+	 */
+	public function save( array $record ): void {
+		$record['version']      = self::RECORD_VERSION;
+		$record['last_refresh'] = gmdate( 'c' );
+		$this->write( $record );
+		// Flag the connector as configured for WP core's Settings > Connectors UI.
+		update_option( self::CORE_API_KEY_OPTION, self::CORE_API_KEY_PLACEHOLDER, false );
+		TokenRefresher::schedule();
+	}
+
+	/**
+	 * Merges fields into the stored record and saves it.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $fields Fields to replace.
+	 * @return void
+	 */
+	public function update( array $fields ): void {
+		$record = $this->get();
+		if ( null === $record ) {
+			return;
+		}
+		$this->save( array_merge( $record, $fields ) );
+	}
+
+	/**
+	 * Marks the record as needing a new sign-in, keeping identity fields.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return void
+	 */
+	public function mark_needs_signin(): void {
+		$record = $this->get();
+		if ( null === $record ) {
+			return;
+		}
+		$record['needs_signin'] = true;
+		$this->write( $record );
+		TokenRefresher::unschedule();
+	}
+
+	/**
+	 * Drops the tokens but keeps the registration for the next sign-in.
+	 *
+	 * OpenAI expects a signed-out app to reuse its issued client id for the same
+	 * host, so client_id, ext_agent_host_id, subject, email and name stay.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return void
+	 */
+	public function sign_out(): void {
+		$record = $this->get();
+		if ( null === $record ) {
+			return;
+		}
+		$remnant                 = array_intersect_key( $record, array_flip( self::REGISTRATION_FIELDS ) );
+		$remnant['version']      = self::RECORD_VERSION;
+		$remnant['needs_signin'] = false;
+		$this->write( $remnant );
+		delete_option( self::CORE_API_KEY_OPTION );
+		TokenRefresher::unschedule();
+	}
+
+	/**
+	 * Returns true when tokens are stored and no new sign-in is needed.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool True when the provider can call OpenAI.
+	 */
+	public function is_connected(): bool {
+		return null !== $this->get_access_token() && null !== $this->get_refresh_token() && ! $this->needs_signin();
+	}
+
+	/**
+	 * Returns true when an issued client id is stored, with or without tokens.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool True when a registration exists.
+	 */
+	public function has_registration(): bool {
+		return null !== $this->get_client_id();
+	}
+
+	/**
+	 * Removes the record, including the registration, and the core placeholder.
 	 *
 	 * @since 0.1.0
 	 *
@@ -135,59 +186,231 @@ class TokenStore {
 	public function clear(): void {
 		delete_option( self::OPTION_NAME );
 		delete_option( self::CORE_API_KEY_OPTION );
+		TokenRefresher::unschedule();
 	}
 
 	/**
-	 * Returns the access token, or null when not connected.
+	 * Returns the access token.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @return string|null The access token.
+	 * @return string|null The token.
 	 */
 	public function get_access_token(): ?string {
-		$data = $this->get();
-		return $data['tokens']['access_token'] ?? null;
+		return $this->string_field( 'access_token' );
 	}
 
 	/**
-	 * Returns the refresh token, or null when not connected.
+	 * Returns the refresh token.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @return string|null The refresh token.
+	 * @return string|null The token.
 	 */
 	public function get_refresh_token(): ?string {
-		$data = $this->get();
-		return $data['tokens']['refresh_token'] ?? null;
+		return $this->string_field( 'refresh_token' );
 	}
 
 	/**
-	 * Returns the ChatGPT workspace account id, or null when not connected.
+	 * Returns the ID token.
 	 *
-	 * @since 0.1.0
+	 * @since 1.0.0
 	 *
-	 * @return string|null The account id.
+	 * @return string|null The token.
 	 */
-	public function get_account_id(): ?string {
-		$data = $this->get();
-		return $data['tokens']['account_id'] ?? null;
+	public function get_id_token(): ?string {
+		return $this->string_field( 'id_token' );
 	}
 
 	/**
-	 * Returns the UNIX timestamp of the last successful refresh, or 0 when
-	 * no tokens are stored.
+	 * Returns the issued client id.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string|null The client id.
+	 */
+	public function get_client_id(): ?string {
+		return $this->string_field( 'client_id' );
+	}
+
+	/**
+	 * Returns the ChatGPT account subject.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string|null The sub claim.
+	 */
+	public function get_subject(): ?string {
+		return $this->string_field( 'subject' );
+	}
+
+	/**
+	 * Returns the account email.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string|null The email.
+	 */
+	public function get_email(): ?string {
+		return $this->string_field( 'email' );
+	}
+
+	/**
+	 * Returns the account display name.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string|null The name.
+	 */
+	public function get_name(): ?string {
+		return $this->string_field( 'name' );
+	}
+
+	/**
+	 * Returns the ext_agent_host_id used at sign-in.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string|null The host id.
+	 */
+	public function get_host_id(): ?string {
+		return $this->string_field( 'ext_agent_host_id' );
+	}
+
+	/**
+	 * Returns the granted scopes.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return list<string> The scopes.
+	 */
+	public function get_scopes(): array {
+		$scopes = $this->get()['scopes'] ?? array();
+		return is_array( $scopes ) ? array_values( array_filter( $scopes, 'is_string' ) ) : array();
+	}
+
+	/**
+	 * Returns the access token expiry, 0 when unknown.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return int UNIX timestamp.
+	 */
+	public function get_expires_at(): int {
+		return $this->int_field( 'expires_at' );
+	}
+
+	/**
+	 * Returns the advisory earliest refresh time, 0 when unknown.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return int UNIX timestamp.
+	 */
+	public function get_earliest_refresh_at(): int {
+		return $this->int_field( 'earliest_refresh_at' );
+	}
+
+	/**
+	 * Returns true when the record must be renewed by a new sign-in.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool True when marked.
+	 */
+	public function needs_signin(): bool {
+		return true === ( $this->get()['needs_signin'] ?? false );
+	}
+
+	/**
+	 * Returns true when the plan usage scope was granted.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool True when granted.
+	 */
+	public function has_plan_scope(): bool {
+		return in_array( PLAN_SCOPE, $this->get_scopes(), true );
+	}
+
+	/**
+	 * Returns the time of the last save, 0 when no record is stored.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @return int The timestamp, or 0.
+	 * @return int UNIX timestamp.
 	 */
 	public function get_last_refresh_timestamp(): int {
-		$data = $this->get();
-		if ( null === $data ) {
-			return 0;
-		}
-		$ts = strtotime( $data['last_refresh'] );
+		$value = $this->get()['last_refresh'] ?? null;
+		$ts    = is_string( $value ) ? strtotime( $value ) : false;
 		return false === $ts ? 0 : $ts;
+	}
+
+	/**
+	 * Decrypts the option into an array, whatever its shape.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return array<string, mixed>|null The decoded payload, or null.
+	 */
+	private function decode(): ?array {
+		$raw = get_option( self::OPTION_NAME, '' );
+		if ( ! is_string( $raw ) || '' === $raw ) {
+			return null;
+		}
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding the ciphertext envelope written by write(); not obfuscation.
+		$decoded = base64_decode( $raw, true );
+		if ( false === $decoded || strlen( $decoded ) < SODIUM_CRYPTO_SECRETBOX_NONCEBYTES + 1 ) {
+			return null;
+		}
+		$nonce = substr( $decoded, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+		$plain = sodium_crypto_secretbox_open( substr( $decoded, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES ), $nonce, $this->key() );
+		if ( false === $plain ) {
+			return null;
+		}
+		$data = json_decode( $plain, true );
+		return is_array( $data ) ? $data : null;
+	}
+
+	/**
+	 * Encrypts and stores a record as is.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $record The record.
+	 * @return void
+	 */
+	private function write( array $record ): void {
+		$nonce  = random_bytes( SODIUM_CRYPTO_SECRETBOX_NONCEBYTES );
+		$cipher = sodium_crypto_secretbox( (string) wp_json_encode( $record ), $nonce, $this->key() );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding nonce+ciphertext as text for option storage; not obfuscation.
+		update_option( self::OPTION_NAME, base64_encode( $nonce . $cipher ), false );
+	}
+
+	/**
+	 * Returns a non-empty string field of the record.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $key Field name.
+	 * @return string|null The value, or null.
+	 */
+	private function string_field( string $key ): ?string {
+		$value = $this->get()[ $key ] ?? null;
+		return is_string( $value ) && '' !== $value ? $value : null;
+	}
+
+	/**
+	 * Returns an integer field of the record, 0 when missing.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $key Field name.
+	 * @return int The value.
+	 */
+	private function int_field( string $key ): int {
+		$value = $this->get()[ $key ] ?? 0;
+		return is_int( $value ) ? $value : 0;
 	}
 
 	/**

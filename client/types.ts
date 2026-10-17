@@ -8,19 +8,45 @@
 
 export type ConnectionStatus = {
 	connected: boolean;
+	needs_signin: boolean;
 	email: string | null;
-	account_id: string | null;
-	plan_type: string | null;
-	is_fedramp: boolean;
-	id_token_expired: boolean;
+	name: string | null;
+	subject: string | null;
+	client_id: string | null;
+	scopes: string[];
+	plan_usage_enabled: boolean;
+	expires_at: number | null;
 	last_refresh: number | null;
-	oauth_client_id: string;
+	show_first_signin_notice: boolean;
+	redirect_uri: string;
+	usage_url: string;
 	provider: {
 		registered: boolean;
 		configured: boolean;
 	};
-	refreshed_at?: number;
 };
+
+export type SignInStart = {
+	authorize_url: string;
+	redirect_uri: string;
+	expires_at: number;
+};
+
+export type DisconnectResult = ConnectionStatus & { revoked: boolean };
+
+export type RefreshResult = ConnectionStatus & { refreshed_at: number };
+
+// Error codes POST /connection/callback returns as the WP_Error code.
+export type CallbackErrorCode =
+	| 'no_pending'
+	| 'bad_callback'
+	| 'state_mismatch'
+	| 'access_denied'
+	| 'registration_incomplete'
+	| 'exchange_failed'
+	| 'id_token_invalid'
+	| 'plan_not_enabled'
+	| 'account_mismatch';
 
 export type Diagnostics = {
 	registry: {
@@ -47,20 +73,12 @@ export type RemoteModelsProbe = {
 	http_status: number;
 	model_ids: string[];
 	text_only_ids: string[];
-	raw_keys: string[];
 	raw_models: RemoteModelEntry[];
 	error: string | null;
 };
 
 export type CacheClearResult = {
 	deleted: number;
-};
-
-export type PairingToken = {
-	token: string;
-	expires_at: number;
-	site_url: string;
-	rest_url: string;
 };
 
 export type BootstrapData = {

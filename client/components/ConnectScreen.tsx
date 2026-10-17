@@ -1,377 +1,366 @@
-import { useEffect, useRef, useState } from '@wordpress/element';
-import { FormFileUpload, TextareaControl } from '@wordpress/components';
+import { useState } from '@wordpress/element';
+import { TextControl } from '@wordpress/components';
 import { Button, Notice } from '@wordpress/ui';
-import { dispatch } from '@wordpress/data';
-import { store as noticesStore } from '@wordpress/notices';
+import { lock as lockIcon } from '@wordpress/icons';
 import { __, sprintf } from '@wordpress/i18n';
 
-import { api } from '../api/client';
-import { errorMessage } from '../utils';
-import type { ConnectionStatus, PairingToken } from '../types';
+import { EMPTY_FIELD, useSignIn } from '../hooks/useSignIn';
+import { formatClock } from '../utils';
+import { ChatGptIcon } from './ChatGptIcon';
+import { ForgetAccountModal } from './ForgetAccountModal';
+import type { ConnectionStatus, SignInStart } from '../types';
+
+const ELIGIBILITY_URL =
+	'https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites';
+
+// Reopens the current attempt's sign-in page without starting a new attempt.
+function reopenSignIn( start: SignInStart | null ) {
+	if ( start ) {
+		window.open( start.authorize_url, '_blank', 'noopener,noreferrer' );
+	}
+}
 
 type Props = {
-	onImported: ( next: ConnectionStatus ) => void;
+	status: ConnectionStatus;
+	onConnected: ( next: ConnectionStatus ) => void;
 };
 
-// npm package name of the companion CLI (source: github.com/Abdalsalaam/chatgpt-wp-connect).
-const CLI_PACKAGE = '@abdalsalaam/chatgpt-wp-connect';
-const POLL_INTERVAL_MS = 2500;
+export function ConnectScreen( { status, onConnected }: Props ) {
+	const signIn = useSignIn( onConnected );
+	const [ callbackUrl, setCallbackUrl ] = useState( '' );
+	const [ clipboardFailed, setClipboardFailed ] = useState( false );
+	const [ confirmForget, setConfirmForget ] = useState( false );
 
-export function ConnectScreen( { onImported }: Props ) {
-	const [ bundle, setBundle ] = useState( '' );
-	const [ submitting, setSubmitting ] = useState( false );
-	const [ inlineError, setInlineError ] = useState< string | null >( null );
+	// A signed-out site keeps its registration and account until it is forgotten.
+	const canForget = ! status.connected && status.client_id !== null;
+	const rememberedAccount = canForget ? status.email ?? status.name : null;
 
-	const [ pairing, setPairing ] = useState< PairingToken | null >( null );
-	const [ pairingBusy, setPairingBusy ] = useState( false );
-	const [ pairingExpired, setPairingExpired ] = useState( false );
-	const [ showAdvanced, setShowAdvanced ] = useState( false );
-	const [ copied, setCopied ] = useState( false );
-	const [ now, setNow ] = useState( () => Date.now() );
-	const pollTimer = useRef< ReturnType< typeof setInterval > | null >( null );
-	const copyTimer = useRef< ReturnType< typeof setTimeout > | null >( null );
-
-	// One-second tick so the countdown re-renders smoothly while a pairing
-	// token is outstanding.
-	useEffect( () => {
-		if ( ! pairing || pairingExpired ) {
-			return;
-		}
-		const id = setInterval( () => setNow( Date.now() ), 1000 );
-		return () => clearInterval( id );
-	}, [ pairing, pairingExpired ] );
-
-	useEffect( () => {
-		return () => {
-			if ( copyTimer.current ) {
-				clearTimeout( copyTimer.current );
-			}
-		};
-	}, [] );
-
-	// Poll /connection while a pairing token is outstanding; the CLI may post
-	// the bundle at any moment, and there's no push channel back from PHP.
-	useEffect( () => {
-		if ( ! pairing ) {
-			return;
-		}
-		pollTimer.current = setInterval( async () => {
-			if ( pairing.expires_at * 1000 < Date.now() ) {
-				stopPolling();
-				setPairingExpired( true );
-				return;
-			}
-			try {
-				const next = await api.getConnection();
-				if ( next.connected ) {
-					stopPolling();
-					setPairing( null );
-					onImported( next );
-					void dispatch( noticesStore ).createSuccessNotice(
-						__(
-							'Connected to ChatGPT.',
-							'ai-provider-for-chatgpt'
-						),
-						{ type: 'snackbar' }
-					);
-				}
-			} catch {
-				// Network blip — keep polling.
-			}
-		}, POLL_INTERVAL_MS );
-
-		return () => stopPolling();
-		// We intentionally re-init the timer only when the pairing token changes.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [ pairing?.token ] );
-
-	const stopPolling = () => {
-		if ( pollTimer.current ) {
-			clearInterval( pollTimer.current );
-			pollTimer.current = null;
-		}
+	const onForgotten = ( next: ConnectionStatus ) => {
+		setConfirmForget( false );
+		setCallbackUrl( '' );
+		signIn.reset();
+		onConnected( next );
 	};
 
-	const beginPairing = async () => {
-		setPairingExpired( false );
-		setInlineError( null );
-		setPairingBusy( true );
+	const restart = () => {
+		setCallbackUrl( '' );
+		void signIn.begin();
+	};
+
+	const errorText =
+		signIn.error?.code === EMPTY_FIELD
+			? __( 'Paste the address first.', 'ai-provider-for-chatgpt' )
+			: signIn.error?.message;
+
+	const blocked = signIn.expired || signIn.needsRestart;
+	const inStep2 = signIn.start !== null;
+	const exampleAddress = `${ status.redirect_uri }?code=...&state=...`;
+
+	const pasteFromClipboard = async () => {
+		setClipboardFailed( false );
 		try {
-			const next = await api.issuePairing();
-			setPairing( next );
-		} catch ( err ) {
-			setInlineError( errorMessage( err ) );
-		} finally {
-			setPairingBusy( false );
-		}
-	};
-
-	const cancelPairing = () => {
-		stopPolling();
-		setPairing( null );
-		setPairingExpired( false );
-	};
-
-	const copyCommand = async ( cmd: string ) => {
-		const flashCopied = () => {
-			setCopied( true );
-			if ( copyTimer.current ) {
-				clearTimeout( copyTimer.current );
-			}
-			copyTimer.current = setTimeout( () => setCopied( false ), 2000 );
-		};
-		try {
-			if ( navigator.clipboard?.writeText ) {
-				await navigator.clipboard.writeText( cmd );
-			} else {
-				// Fallback for insecure contexts where the async clipboard API
-				// is unavailable. Uses a hidden textarea + execCommand('copy').
-				const ta = document.createElement( 'textarea' );
-				ta.value = cmd;
-				ta.setAttribute( 'readonly', '' );
-				ta.style.position = 'absolute';
-				ta.style.left = '-9999px';
-				document.body.appendChild( ta );
-				ta.select();
-				document.execCommand( 'copy' );
-				document.body.removeChild( ta );
-			}
-			flashCopied();
-			void dispatch( noticesStore ).createSuccessNotice(
-				__( 'Command copied.', 'ai-provider-for-chatgpt' ),
-				{ type: 'snackbar' }
-			);
+			setCallbackUrl( ( await navigator.clipboard.readText() ).trim() );
 		} catch {
-			void dispatch( noticesStore ).createErrorNotice(
-				__(
-					'Could not copy the command — copy it manually.',
-					'ai-provider-for-chatgpt'
-				),
-				{ type: 'snackbar' }
-			);
+			setClipboardFailed( true );
 		}
 	};
 
-	const submit = async ( raw: string ) => {
-		if ( raw.trim() === '' ) {
-			setInlineError(
-				__(
-					'Paste the auth bundle JSON first.',
-					'ai-provider-for-chatgpt'
-				)
-			);
-			return;
-		}
-		setInlineError( null );
-		setSubmitting( true );
-		try {
-			const next = await api.importBundle( raw );
-			onImported( next );
-			void dispatch( noticesStore ).createSuccessNotice(
-				__( 'Auth bundle imported.', 'ai-provider-for-chatgpt' ),
-				{ type: 'snackbar' }
-			);
-			setBundle( '' );
-		} catch ( err ) {
-			setInlineError( errorMessage( err ) );
-		} finally {
-			setSubmitting( false );
-		}
-	};
-
-	const command = pairing
-		? `npx ${ CLI_PACKAGE } ${ pairing.site_url } ${ pairing.token }`
-		: '';
-
-	const remainingSeconds = pairing
-		? Math.max( 0, Math.round( pairing.expires_at - now / 1000 ) )
-		: 0;
-	const remainingClock = `${ Math.floor( remainingSeconds / 60 ) }:${ String(
-		remainingSeconds % 60
-	).padStart( 2, '0' ) }`;
+	const steps = [
+		__(
+			'Click Continue with ChatGPT. A ChatGPT sign-in page opens in a new tab.',
+			'ai-provider-for-chatgpt'
+		),
+		__(
+			'Sign in, keep the agent name, and approve Use your ChatGPT plan.',
+			'ai-provider-for-chatgpt'
+		),
+		__(
+			'The tab then shows an error such as "This site can\'t be reached" for 127.0.0.1. That is expected: nothing is wrong.',
+			'ai-provider-for-chatgpt'
+		),
+		__(
+			"Copy the full address from that tab's address bar, come back to this tab, paste it below and click Connect.",
+			'ai-provider-for-chatgpt'
+		),
+	];
 
 	return (
 		<div className="ai-provider-for-chatgpt-connect">
+			{ status.needs_signin && (
+				<Notice.Root intent="warning">
+					<Notice.Description>
+						{ status.email
+							? sprintf(
+									/* translators: %s: email of the ChatGPT account that was connected. */
+									__(
+										'The ChatGPT session for %s ended. Sign in again to keep using your plan on this site.',
+										'ai-provider-for-chatgpt'
+									),
+									status.email
+							  )
+							: __(
+									'The ChatGPT session ended. Sign in again to keep using your plan on this site.',
+									'ai-provider-for-chatgpt'
+							  ) }
+					</Notice.Description>
+				</Notice.Root>
+			) }
+
 			<p>
 				{ __(
-					'Click the button below, then run the one-line command on your laptop. Your browser opens an OpenAI sign-in window; once you approve, this page connects automatically.',
+					"Plan usage needs a ChatGPT Plus, Pro or Go account. AI requests from this site are billed to that plan. Requests are sent with store set to false, so OpenAI does not keep them for later retrieval. OpenAI's privacy policy covers how your content is handled.",
 					'ai-provider-for-chatgpt'
 				) }
 			</p>
 
-			{ inlineError && (
+			{ errorText && (
 				<Notice.Root intent="error">
-					<Notice.Description>{ inlineError }</Notice.Description>
-					<Notice.CloseIcon
-						onClick={ () => setInlineError( null ) }
-					/>
+					<Notice.Description>{ errorText }</Notice.Description>
+					{ signIn.error?.code === 'plan_not_enabled' && (
+						<Notice.Actions>
+							<Notice.ActionLink
+								href={ ELIGIBILITY_URL }
+								openInNewTab
+							>
+								{ __(
+									'Learn more',
+									'ai-provider-for-chatgpt'
+								) }
+							</Notice.ActionLink>
+						</Notice.Actions>
+					) }
+					{ signIn.error?.code === 'account_mismatch' &&
+						canForget && (
+							<Notice.Actions>
+								<Notice.ActionButton
+									onClick={ () => setConfirmForget( true ) }
+								>
+									{ __(
+										'Use a different ChatGPT account',
+										'ai-provider-for-chatgpt'
+									) }
+								</Notice.ActionButton>
+							</Notice.Actions>
+						) }
+					<Notice.CloseIcon onClick={ signIn.clearError } />
 				</Notice.Root>
 			) }
 
-			{ ! pairing && (
+			<Notice.Root
+				intent="info"
+				icon={ lockIcon }
+				className="ai-provider-for-chatgpt-privacy"
+			>
+				<Notice.Title>
+					{ __(
+						'Your ChatGPT account stays private',
+						'ai-provider-for-chatgpt'
+					) }
+				</Notice.Title>
+				<Notice.Description>
+					{ __(
+						'This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. Your website keeps the connection encrypted in its own database and talks to OpenAI directly. The connection cannot read your ChatGPT conversations or memories. You can disconnect at any time on this page or in your ChatGPT settings.',
+						'ai-provider-for-chatgpt'
+					) }
+				</Notice.Description>
+			</Notice.Root>
+
+			<h3 className="ai-provider-for-chatgpt-steps-title">
+				{ __( 'How connecting works', 'ai-provider-for-chatgpt' ) }
+			</h3>
+			<ol className="ai-provider-for-chatgpt-steps">
+				{ steps.map( ( text, index ) => {
+					// After Continue, the admin's next move is steps 3 and 4.
+					const current = inStep2 && index >= 2;
+					return (
+						<li
+							key={ index }
+							className={ current ? 'is-current' : undefined }
+							aria-current={
+								current && index === 2 ? 'step' : undefined
+							}
+						>
+							{ text }
+						</li>
+					);
+				} ) }
+			</ol>
+			<figure className="ai-provider-for-chatgpt-addressbar">
+				<div className="ai-provider-for-chatgpt-addressbar-bar">
+					<span
+						className="ai-provider-for-chatgpt-addressbar-dots"
+						aria-hidden="true"
+					/>
+					<code>{ exampleAddress }</code>
+				</div>
+				<figcaption>
+					{ __(
+						'Copy this whole address',
+						'ai-provider-for-chatgpt'
+					) }
+				</figcaption>
+			</figure>
+
+			{ ! signIn.start && canForget && (
 				<p className="ai-provider-for-chatgpt-actions-row">
-					<Button
-						variant="solid"
-						tone="brand"
-						loading={ pairingBusy }
-						disabled={ pairingBusy }
-						onClick={ beginPairing }
-					>
-						{ __(
-							'Connect with ChatGPT',
-							'ai-provider-for-chatgpt'
-						) }
-					</Button>
+					{ rememberedAccount && (
+						<span>
+							{ sprintf(
+								/* translators: %s: email, or name, of the ChatGPT account this site remembers. */
+								__(
+									'Sign in again as %s',
+									'ai-provider-for-chatgpt'
+								),
+								rememberedAccount
+							) }
+						</span>
+					) }
 					<Button
 						variant="minimal"
-						onClick={ () => setShowAdvanced( ( v ) => ! v ) }
+						size="small"
+						onClick={ () => setConfirmForget( true ) }
 					>
-						{ showAdvanced
-							? __(
-									'Hide advanced',
-									'ai-provider-for-chatgpt'
-							  )
-							: __(
-									'Have a Codex auth.json already? Use advanced',
-									'ai-provider-for-chatgpt'
-							  ) }
+						{ __(
+							'Use a different ChatGPT account',
+							'ai-provider-for-chatgpt'
+						) }
 					</Button>
 				</p>
 			) }
 
-			{ pairing && ! pairingExpired && (
-				<div className="ai-provider-for-chatgpt-pairing">
-					<p>
+			{ ! signIn.start && (
+				<p className="ai-provider-for-chatgpt-actions-row">
+					<Button
+						className="ai-provider-for-chatgpt-continue"
+						variant="solid"
+						tone="neutral"
+						loading={ signIn.starting }
+						disabled={ signIn.starting }
+						onClick={ () => void signIn.begin() }
+					>
+						<ChatGptIcon className="ai-provider-for-chatgpt-continue-icon" />
 						{ __(
-							'Run this on your laptop (Node 18+ required):',
+							'Continue with ChatGPT',
 							'ai-provider-for-chatgpt'
 						) }
+					</Button>
+				</p>
+			) }
+
+			{ signIn.start && (
+				<div className="ai-provider-for-chatgpt-step">
+					<p>
+						<strong>
+							{ __(
+								'Waiting for you in the other tab. When it shows the error page, copy its address and paste it here.',
+								'ai-provider-for-chatgpt'
+							) }
+						</strong>
 					</p>
-					<pre className="ai-provider-for-chatgpt-pairing-cmd">
-						<code>{ command }</code>
-					</pre>
 					<p className="ai-provider-for-chatgpt-actions-row">
+						<span>
+							{ __(
+								"Didn't see the ChatGPT tab?",
+								'ai-provider-for-chatgpt'
+							) }
+						</span>
 						<Button
-							variant="solid"
-							onClick={ () => copyCommand( command ) }
+							variant="outline"
+							tone="neutral"
+							disabled={ blocked }
+							onClick={ () => reopenSignIn( signIn.start ) }
 						>
-							{ copied
+							<ChatGptIcon className="ai-provider-for-chatgpt-continue-icon" />
+							{ __(
+								'Open ChatGPT sign-in',
+								'ai-provider-for-chatgpt'
+							) }
+						</Button>
+					</p>
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						label={ __(
+							'Address of the page you landed on',
+							'ai-provider-for-chatgpt'
+						) }
+						value={ callbackUrl }
+						onChange={ setCallbackUrl }
+						placeholder={ `${ signIn.start.redirect_uri }?code=...` }
+						help={
+							clipboardFailed
 								? __(
-										'Copied!',
+										'Could not read the clipboard. Paste the address with Ctrl+V or Cmd+V.',
 										'ai-provider-for-chatgpt'
 								  )
-								: __(
-										'Copy command',
-										'ai-provider-for-chatgpt'
-								  ) }
-						</Button>
-						<Button variant="minimal" onClick={ cancelPairing }>
-							{ __( 'Cancel', 'ai-provider-for-chatgpt' ) }
-						</Button>
-					</p>
-					<p>
-						<em>
-							{ sprintf(
-								/* translators: %s: remaining time formatted as m:ss until the pairing token expires */
-								__(
-									'Waiting for sign-in… (token expires in %s)',
-									'ai-provider-for-chatgpt'
-								),
-								remainingClock
-							) }
-						</em>
-					</p>
-				</div>
-			) }
-
-			{ pairingExpired && (
-				<Notice.Root intent="warning">
-					<Notice.Description>
-						{ __(
-							'The pairing token expired before sign-in completed. Start over.',
-							'ai-provider-for-chatgpt'
-						) }
-					</Notice.Description>
-					<Notice.Actions>
-						<Button variant="solid" onClick={ beginPairing }>
-							{ __( 'Try again', 'ai-provider-for-chatgpt' ) }
-						</Button>
-					</Notice.Actions>
-				</Notice.Root>
-			) }
-
-			{ showAdvanced && (
-				<div className="ai-provider-for-chatgpt-advanced">
-					<h3>
-						{ __(
-							'Advanced: import a Codex auth.json',
-							'ai-provider-for-chatgpt'
-						) }
-					</h3>
-					<p>
-						{ __(
-							'If you already ran `codex login`, paste ~/.codex/auth.json below or upload the file.',
-							'ai-provider-for-chatgpt'
-						) }
-					</p>
-					<TextareaControl
-						label={ __(
-							'Paste the contents of ~/.codex/auth.json',
-							'ai-provider-for-chatgpt'
-						) }
-						value={ bundle }
-						onChange={ setBundle }
-						rows={ 10 }
-						placeholder={
-							'{"tokens": {"id_token": "...", "access_token": "...", "refresh_token": "...", "account_id": "..."}, "last_refresh": "..."}'
+								: sprintf(
+										/* translators: %s: the callback address the pasted address must start with. */
+										__(
+											'It starts with %s',
+											'ai-provider-for-chatgpt'
+										),
+										signIn.start.redirect_uri
+								  )
 						}
+						autoComplete="off"
+						spellCheck={ false }
+						disabled={ blocked || signIn.submitting }
 					/>
 					<p className="ai-provider-for-chatgpt-actions-row">
 						<Button
 							variant="solid"
-							loading={ submitting }
-							disabled={ submitting }
-							onClick={ () => submit( bundle ) }
+							tone="brand"
+							loading={ signIn.submitting }
+							disabled={ blocked || signIn.submitting }
+							onClick={ () => void signIn.submit( callbackUrl ) }
 						>
-							{ __(
-								'Import bundle',
-								'ai-provider-for-chatgpt'
-							) }
+							{ __( 'Connect', 'ai-provider-for-chatgpt' ) }
 						</Button>
-						<FormFileUpload
-							accept="application/json,.json"
-							onChange={ ( event ) => {
-								const file =
-									event.currentTarget.files?.[ 0 ];
-								if ( ! file ) {
-									return;
-								}
-								const reader = new FileReader();
-								reader.onload = () => {
-									const text = String(
-										reader.result ?? ''
-									);
-									setBundle( text );
-									void submit( text );
-								};
-								reader.onerror = () => {
-									setInlineError(
-										__(
-											'Could not read the selected file.',
-											'ai-provider-for-chatgpt'
-										)
-									);
-								};
-								reader.readAsText( file );
-							} }
+						{ typeof navigator.clipboard?.readText ===
+							'function' && (
+							<Button
+								variant="outline"
+								disabled={ blocked || signIn.submitting }
+								onClick={ () => void pasteFromClipboard() }
+							>
+								{ __(
+									'Paste from clipboard',
+									'ai-provider-for-chatgpt'
+								) }
+							</Button>
+						) }
+						<Button
+							variant={ blocked ? 'solid' : 'minimal' }
+							tone={ blocked ? 'brand' : 'neutral' }
+							disabled={ signIn.starting || signIn.submitting }
+							loading={ signIn.starting }
+							onClick={ restart }
 						>
-							{ __(
-								'…or upload the file',
-								'ai-provider-for-chatgpt'
-							) }
-						</FormFileUpload>
+							{ __( 'Start again', 'ai-provider-for-chatgpt' ) }
+						</Button>
+					</p>
+					<p className="ai-provider-for-chatgpt-countdown">
+						{ signIn.expired
+							? __(
+									'This sign-in attempt expired. Start again.',
+									'ai-provider-for-chatgpt'
+							  )
+							: sprintf(
+									/* translators: %s: time left as m:ss before the sign-in attempt expires. */
+									__(
+										'This sign-in attempt expires in %s.',
+										'ai-provider-for-chatgpt'
+									),
+									formatClock( signIn.remainingSeconds )
+							  ) }
 					</p>
 				</div>
+			) }
+			{ confirmForget && canForget && (
+				<ForgetAccountModal
+					onClose={ () => setConfirmForget( false ) }
+					onForgotten={ onForgotten }
+				/>
 			) }
 		</div>
 	);
