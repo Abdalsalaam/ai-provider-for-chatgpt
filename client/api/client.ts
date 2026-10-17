@@ -9,7 +9,6 @@ import type {
 	ConnectionStatus,
 	Diagnostics,
 	DisconnectResult,
-	PairingToken,
 	RefreshResult,
 	RemoteModelsProbe,
 	SignInStart,
@@ -52,23 +51,6 @@ export const api = {
 	refresh(): Promise< RefreshResult > {
 		return apiFetch< RefreshResult >( {
 			path: `/${ NS }/connection/refresh`,
-			method: 'POST',
-		} );
-	},
-
-	// Removed together with the pairing screen in the next commit.
-	importBundle( bundle: string ): Promise< ConnectionStatus > {
-		return apiFetch< ConnectionStatus >( {
-			path: `/${ NS }/connection`,
-			method: 'POST',
-			data: { bundle },
-		} );
-	},
-
-	// Removed together with the pairing screen in the next commit.
-	issuePairing(): Promise< PairingToken > {
-		return apiFetch< PairingToken >( {
-			path: `/${ NS }/connection/pairing`,
 			method: 'POST',
 		} );
 	},

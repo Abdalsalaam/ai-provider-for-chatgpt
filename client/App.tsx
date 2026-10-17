@@ -17,6 +17,7 @@ import { useConnection } from './hooks/useConnection';
 import { errorMessage } from './utils';
 import { ChatGptIcon } from './components/ChatGptIcon';
 import { ConnectionCard } from './components/ConnectionCard';
+import { ConnectScreen } from './components/ConnectScreen';
 import { Diagnostics } from './components/Diagnostics';
 import { NoticesArea } from './components/NoticesArea';
 
@@ -139,17 +140,6 @@ export function App() {
 						</Notice.Root>
 					) }
 
-					{ data && ! isConnected && (
-						<Notice.Root intent="warning">
-							<Notice.Description>
-								{ __(
-									'No ChatGPT credentials imported yet. Connect below to enable the provider.',
-									'ai-provider-for-chatgpt'
-								) }
-							</Notice.Description>
-						</Notice.Root>
-					) }
-
 					{ data && (
 						<Card.Root>
 							<Card.Header>
@@ -160,13 +150,23 @@ export function App() {
 												'ai-provider-for-chatgpt'
 										  )
 										: __(
-												'Connect ChatGPT',
+												'Connect your ChatGPT account',
 												'ai-provider-for-chatgpt'
 										  ) }
 								</Card.Title>
 							</Card.Header>
 							<Card.Content>
-								<ConnectionCard data={ data } apply={ apply } />
+								{ isConnected ? (
+									<ConnectionCard
+										data={ data }
+										apply={ apply }
+									/>
+								) : (
+									<ConnectScreen
+										status={ data }
+										onConnected={ apply }
+									/>
+								) }
 							</Card.Content>
 						</Card.Root>
 					) }

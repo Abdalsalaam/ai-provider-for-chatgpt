@@ -81,13 +81,6 @@ export type CacheClearResult = {
 	deleted: number;
 };
 
-export type PairingToken = {
-	token: string;
-	expires_at: number;
-	site_url: string;
-	rest_url: string;
-};
-
 export type BootstrapData = {
 	restNamespace: string;
 	restRoot: string;

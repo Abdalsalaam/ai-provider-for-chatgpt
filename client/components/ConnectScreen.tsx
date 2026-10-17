@@ -1,363 +1,173 @@
-import { useEffect, useRef, useState } from '@wordpress/element';
-import { FormFileUpload, TextareaControl } from '@wordpress/components';
-import { Button, Notice } from '@wordpress/ui';
-import { dispatch } from '@wordpress/data';
-import { store as noticesStore } from '@wordpress/notices';
+import { useState } from '@wordpress/element';
+import { TextControl } from '@wordpress/components';
+import { Button, Link, Notice } from '@wordpress/ui';
 import { __, sprintf } from '@wordpress/i18n';
 
-import { api } from '../api/client';
-import { errorMessage } from '../utils';
-import type { ConnectionStatus, PairingToken } from '../types';
+import { EMPTY_FIELD, useSignIn } from '../hooks/useSignIn';
+import { formatClock } from '../utils';
+import { ChatGptIcon } from './ChatGptIcon';
+import type { ConnectionStatus } from '../types';
+
+const ELIGIBILITY_URL =
+	'https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites';
 
 type Props = {
-	onImported: ( next: ConnectionStatus ) => void;
+	status: ConnectionStatus;
+	onConnected: ( next: ConnectionStatus ) => void;
 };
 
-// npm package name of the companion CLI (source: github.com/Abdalsalaam/chatgpt-wp-connect).
-const CLI_PACKAGE = '@abdalsalaam/chatgpt-wp-connect';
-const POLL_INTERVAL_MS = 2500;
+export function ConnectScreen( { status, onConnected }: Props ) {
+	const signIn = useSignIn( onConnected );
+	const [ callbackUrl, setCallbackUrl ] = useState( '' );
 
-export function ConnectScreen( { onImported }: Props ) {
-	const [ bundle, setBundle ] = useState( '' );
-	const [ submitting, setSubmitting ] = useState( false );
-	const [ inlineError, setInlineError ] = useState< string | null >( null );
-
-	const [ pairing, setPairing ] = useState< PairingToken | null >( null );
-	const [ pairingBusy, setPairingBusy ] = useState( false );
-	const [ pairingExpired, setPairingExpired ] = useState( false );
-	const [ showAdvanced, setShowAdvanced ] = useState( false );
-	const [ copied, setCopied ] = useState( false );
-	const [ now, setNow ] = useState( () => Date.now() );
-	const pollTimer = useRef< ReturnType< typeof setInterval > | null >( null );
-	const copyTimer = useRef< ReturnType< typeof setTimeout > | null >( null );
-
-	// One-second tick so the countdown re-renders smoothly while a pairing
-	// token is outstanding.
-	useEffect( () => {
-		if ( ! pairing || pairingExpired ) {
-			return;
-		}
-		const id = setInterval( () => setNow( Date.now() ), 1000 );
-		return () => clearInterval( id );
-	}, [ pairing, pairingExpired ] );
-
-	useEffect( () => {
-		return () => {
-			if ( copyTimer.current ) {
-				clearTimeout( copyTimer.current );
-			}
-		};
-	}, [] );
-
-	// Poll /connection while a pairing token is outstanding; the CLI may post
-	// the bundle at any moment, and there's no push channel back from PHP.
-	useEffect( () => {
-		if ( ! pairing ) {
-			return;
-		}
-		pollTimer.current = setInterval( async () => {
-			if ( pairing.expires_at * 1000 < Date.now() ) {
-				stopPolling();
-				setPairingExpired( true );
-				return;
-			}
-			try {
-				const next = await api.getConnection();
-				if ( next.connected ) {
-					stopPolling();
-					setPairing( null );
-					onImported( next );
-					void dispatch( noticesStore ).createSuccessNotice(
-						__(
-							'Connected to ChatGPT.',
-							'ai-provider-for-chatgpt'
-						),
-						{ type: 'snackbar' }
-					);
-				}
-			} catch {
-				// Network blip — keep polling.
-			}
-		}, POLL_INTERVAL_MS );
-
-		return () => stopPolling();
-		// We intentionally re-init the timer only when the pairing token changes.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [ pairing?.token ] );
-
-	const stopPolling = () => {
-		if ( pollTimer.current ) {
-			clearInterval( pollTimer.current );
-			pollTimer.current = null;
-		}
+	const restart = () => {
+		setCallbackUrl( '' );
+		void signIn.begin();
 	};
 
-	const beginPairing = async () => {
-		setPairingExpired( false );
-		setInlineError( null );
-		setPairingBusy( true );
-		try {
-			const next = await api.issuePairing();
-			setPairing( next );
-		} catch ( err ) {
-			setInlineError( errorMessage( err ) );
-		} finally {
-			setPairingBusy( false );
-		}
-	};
+	const errorText =
+		signIn.error?.code === EMPTY_FIELD
+			? __( 'Paste the address first.', 'ai-provider-for-chatgpt' )
+			: signIn.error?.message;
 
-	const cancelPairing = () => {
-		stopPolling();
-		setPairing( null );
-		setPairingExpired( false );
-	};
-
-	const copyCommand = async ( cmd: string ) => {
-		const flashCopied = () => {
-			setCopied( true );
-			if ( copyTimer.current ) {
-				clearTimeout( copyTimer.current );
-			}
-			copyTimer.current = setTimeout( () => setCopied( false ), 2000 );
-		};
-		try {
-			if ( navigator.clipboard?.writeText ) {
-				await navigator.clipboard.writeText( cmd );
-			} else {
-				// Fallback for insecure contexts where the async clipboard API
-				// is unavailable. Uses a hidden textarea + execCommand('copy').
-				const ta = document.createElement( 'textarea' );
-				ta.value = cmd;
-				ta.setAttribute( 'readonly', '' );
-				ta.style.position = 'absolute';
-				ta.style.left = '-9999px';
-				document.body.appendChild( ta );
-				ta.select();
-				document.execCommand( 'copy' );
-				document.body.removeChild( ta );
-			}
-			flashCopied();
-			void dispatch( noticesStore ).createSuccessNotice(
-				__( 'Command copied.', 'ai-provider-for-chatgpt' ),
-				{ type: 'snackbar' }
-			);
-		} catch {
-			void dispatch( noticesStore ).createErrorNotice(
-				__(
-					'Could not copy the command — copy it manually.',
-					'ai-provider-for-chatgpt'
-				),
-				{ type: 'snackbar' }
-			);
-		}
-	};
-
-	const submit = async ( raw: string ) => {
-		if ( raw.trim() === '' ) {
-			setInlineError(
-				__(
-					'Paste the auth bundle JSON first.',
-					'ai-provider-for-chatgpt'
-				)
-			);
-			return;
-		}
-		setInlineError( null );
-		setSubmitting( true );
-		try {
-			const next = await api.importBundle( raw );
-			onImported( next );
-			void dispatch( noticesStore ).createSuccessNotice(
-				__( 'Auth bundle imported.', 'ai-provider-for-chatgpt' ),
-				{ type: 'snackbar' }
-			);
-			setBundle( '' );
-		} catch ( err ) {
-			setInlineError( errorMessage( err ) );
-		} finally {
-			setSubmitting( false );
-		}
-	};
-
-	const command = pairing
-		? `npx ${ CLI_PACKAGE } ${ pairing.site_url } ${ pairing.token }`
-		: '';
-
-	const remainingSeconds = pairing
-		? Math.max( 0, Math.round( pairing.expires_at - now / 1000 ) )
-		: 0;
-	const remainingClock = `${ Math.floor( remainingSeconds / 60 ) }:${ String(
-		remainingSeconds % 60
-	).padStart( 2, '0' ) }`;
+	const blocked = signIn.expired || signIn.needsRestart;
 
 	return (
 		<div className="ai-provider-for-chatgpt-connect">
+			{ status.needs_signin && (
+				<Notice.Root intent="warning">
+					<Notice.Description>
+						{ status.email
+							? sprintf(
+									/* translators: %s: email of the ChatGPT account that was connected. */
+									__(
+										'The ChatGPT session for %s ended. Sign in again to keep using your plan on this site.',
+										'ai-provider-for-chatgpt'
+									),
+									status.email
+							  )
+							: __(
+									'The ChatGPT session ended. Sign in again to keep using your plan on this site.',
+									'ai-provider-for-chatgpt'
+							  ) }
+					</Notice.Description>
+				</Notice.Root>
+			) }
+
 			<p>
 				{ __(
-					'Click the button below, then run the one-line command on your laptop. Your browser opens an OpenAI sign-in window; once you approve, this page connects automatically.',
+					'Plan usage needs a ChatGPT Plus, Pro or Go account. AI requests from this site are billed to that plan. Requests are sent with store set to false, so OpenAI does not keep them for later retrieval; whether your content is used to improve models is governed by the data controls of your ChatGPT account.',
 					'ai-provider-for-chatgpt'
 				) }
 			</p>
 
-			{ inlineError && (
+			{ errorText && (
 				<Notice.Root intent="error">
-					<Notice.Description>{ inlineError }</Notice.Description>
-					<Notice.CloseIcon
-						onClick={ () => setInlineError( null ) }
-					/>
+					<Notice.Description>{ errorText }</Notice.Description>
+					{ signIn.error?.code === 'plan_not_enabled' && (
+						<Notice.Actions>
+							<Notice.ActionLink
+								href={ ELIGIBILITY_URL }
+								openInNewTab
+							>
+								{ __(
+									'Learn more',
+									'ai-provider-for-chatgpt'
+								) }
+							</Notice.ActionLink>
+						</Notice.Actions>
+					) }
+					<Notice.CloseIcon onClick={ signIn.clearError } />
 				</Notice.Root>
 			) }
 
-			{ ! pairing && (
+			{ ! signIn.start && (
 				<p className="ai-provider-for-chatgpt-actions-row">
 					<Button
+						className="ai-provider-for-chatgpt-continue"
 						variant="solid"
-						tone="brand"
-						loading={ pairingBusy }
-						disabled={ pairingBusy }
-						onClick={ beginPairing }
+						tone="neutral"
+						loading={ signIn.starting }
+						disabled={ signIn.starting }
+						onClick={ () => void signIn.begin() }
 					>
+						<ChatGptIcon className="ai-provider-for-chatgpt-continue-icon" />
 						{ __(
-							'Connect with ChatGPT',
+							'Continue with ChatGPT',
 							'ai-provider-for-chatgpt'
 						) }
-					</Button>
-					<Button
-						variant="minimal"
-						onClick={ () => setShowAdvanced( ( v ) => ! v ) }
-					>
-						{ showAdvanced
-							? __( 'Hide advanced', 'ai-provider-for-chatgpt' )
-							: __(
-									'Have a Codex auth.json already? Use advanced',
-									'ai-provider-for-chatgpt'
-							  ) }
 					</Button>
 				</p>
 			) }
 
-			{ pairing && ! pairingExpired && (
-				<div className="ai-provider-for-chatgpt-pairing">
+			{ signIn.start && (
+				<div className="ai-provider-for-chatgpt-step">
 					<p>
 						{ __(
-							'Run this on your laptop (Node 18+ required):',
+							'A ChatGPT sign-in page opened in a new tab. If it did not open, use this link:',
 							'ai-provider-for-chatgpt'
-						) }
-					</p>
-					<pre className="ai-provider-for-chatgpt-pairing-cmd">
-						<code>{ command }</code>
-					</pre>
-					<p className="ai-provider-for-chatgpt-actions-row">
-						<Button
-							variant="solid"
-							onClick={ () => copyCommand( command ) }
-						>
-							{ copied
-								? __( 'Copied!', 'ai-provider-for-chatgpt' )
-								: __(
-										'Copy command',
-										'ai-provider-for-chatgpt'
-								  ) }
-						</Button>
-						<Button variant="minimal" onClick={ cancelPairing }>
-							{ __( 'Cancel', 'ai-provider-for-chatgpt' ) }
-						</Button>
-					</p>
-					<p>
-						<em>
-							{ sprintf(
-								/* translators: %s: remaining time formatted as m:ss until the pairing token expires */
-								__(
-									'Waiting for sign-in… (token expires in %s)',
-									'ai-provider-for-chatgpt'
-								),
-								remainingClock
+						) }{ ' ' }
+						<Link href={ signIn.start.authorize_url } openInNewTab>
+							{ __(
+								'Open the ChatGPT sign-in page',
+								'ai-provider-for-chatgpt'
 							) }
-						</em>
+						</Link>
 					</p>
-				</div>
-			) }
-
-			{ pairingExpired && (
-				<Notice.Root intent="warning">
-					<Notice.Description>
-						{ __(
-							'The pairing token expired before sign-in completed. Start over.',
-							'ai-provider-for-chatgpt'
-						) }
-					</Notice.Description>
-					<Notice.Actions>
-						<Button variant="solid" onClick={ beginPairing }>
-							{ __( 'Try again', 'ai-provider-for-chatgpt' ) }
-						</Button>
-					</Notice.Actions>
-				</Notice.Root>
-			) }
-
-			{ showAdvanced && (
-				<div className="ai-provider-for-chatgpt-advanced">
-					<h3>
-						{ __(
-							'Advanced: import a Codex auth.json',
-							'ai-provider-for-chatgpt'
-						) }
-					</h3>
 					<p>
 						{ __(
-							'If you already ran `codex login`, paste ~/.codex/auth.json below or upload the file.',
+							'After you approve, the browser opens a page at 127.0.0.1 that cannot load. That is expected. Copy the full address from the address bar and paste it here.',
 							'ai-provider-for-chatgpt'
 						) }
 					</p>
-					<TextareaControl
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
 						label={ __(
-							'Paste the contents of ~/.codex/auth.json',
+							'Address of the page you landed on',
 							'ai-provider-for-chatgpt'
 						) }
-						value={ bundle }
-						onChange={ setBundle }
-						rows={ 10 }
-						placeholder={
-							'{"tokens": {"id_token": "...", "access_token": "...", "refresh_token": "...", "account_id": "..."}, "last_refresh": "..."}'
-						}
+						value={ callbackUrl }
+						onChange={ setCallbackUrl }
+						placeholder={ `${ signIn.start.redirect_uri }?code=...` }
+						autoComplete="off"
+						spellCheck={ false }
+						disabled={ blocked || signIn.submitting }
 					/>
 					<p className="ai-provider-for-chatgpt-actions-row">
 						<Button
 							variant="solid"
-							loading={ submitting }
-							disabled={ submitting }
-							onClick={ () => submit( bundle ) }
+							tone="brand"
+							loading={ signIn.submitting }
+							disabled={ blocked || signIn.submitting }
+							onClick={ () => void signIn.submit( callbackUrl ) }
 						>
-							{ __( 'Import bundle', 'ai-provider-for-chatgpt' ) }
+							{ __( 'Connect', 'ai-provider-for-chatgpt' ) }
 						</Button>
-						<FormFileUpload
-							accept="application/json,.json"
-							onChange={ ( event ) => {
-								const file = event.currentTarget.files?.[ 0 ];
-								if ( ! file ) {
-									return;
-								}
-								const reader = new FileReader();
-								reader.onload = () => {
-									const text = String( reader.result ?? '' );
-									setBundle( text );
-									void submit( text );
-								};
-								reader.onerror = () => {
-									setInlineError(
-										__(
-											'Could not read the selected file.',
-											'ai-provider-for-chatgpt'
-										)
-									);
-								};
-								reader.readAsText( file );
-							} }
+						<Button
+							variant={ blocked ? 'solid' : 'minimal' }
+							tone={ blocked ? 'brand' : 'neutral' }
+							disabled={ signIn.starting || signIn.submitting }
+							loading={ signIn.starting }
+							onClick={ restart }
 						>
-							{ __(
-								'…or upload the file',
-								'ai-provider-for-chatgpt'
-							) }
-						</FormFileUpload>
+							{ __( 'Start again', 'ai-provider-for-chatgpt' ) }
+						</Button>
+					</p>
+					<p className="ai-provider-for-chatgpt-countdown">
+						{ signIn.expired
+							? __(
+									'This sign-in attempt expired. Start again.',
+									'ai-provider-for-chatgpt'
+							  )
+							: sprintf(
+									/* translators: %s: time left as m:ss before the sign-in attempt expires. */
+									__(
+										'This sign-in attempt expires in %s.',
+										'ai-provider-for-chatgpt'
+									),
+									formatClock( signIn.remainingSeconds )
+							  ) }
 					</p>
 				</div>
 			) }

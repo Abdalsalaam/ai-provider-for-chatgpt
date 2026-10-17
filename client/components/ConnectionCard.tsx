@@ -1,7 +1,6 @@
 import { __ } from '@wordpress/i18n';
 import { dateI18n } from '@wordpress/date';
 
-import { ConnectScreen } from './ConnectScreen';
 import type { ConnectionStatus } from '../types';
 
 type Props = {
@@ -20,11 +19,7 @@ function formatTimestamp( ts: number | null ): string {
 	return dateI18n( 'Y-m-d H:i', ts * 1000 );
 }
 
-export function ConnectionCard( { data, apply }: Props ) {
-	if ( ! data.connected ) {
-		return <ConnectScreen onImported={ apply } />;
-	}
-
+export function ConnectionCard( { data }: Props ) {
 	return (
 		<table
 			className="form-table ai-provider-for-chatgpt-table"
