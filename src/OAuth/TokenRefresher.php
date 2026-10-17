@@ -95,15 +95,17 @@ class TokenRefresher {
 	 *
 	 * Returns REFRESHED after a rotation, BUSY when another request holds the lock
 	 * and the current token is still valid, and ALREADY_ROTATED when another
-	 * request rotated the token first.
+	 * request rotated the token first. With $treat_as_expired a busy lock always
+	 * waits for the holder, for a token the API rejected before its expiry.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @param string|null $expected_refresh_token Refresh token the caller read, null to use the stored one.
+	 * @param bool        $treat_as_expired       Wait on a busy lock even when the token looks valid.
 	 * @return string One of REFRESHED, BUSY or ALREADY_ROTATED.
 	 * @throws OAuthException When not connected, signed out, or the refresh fails.
 	 */
-	public function refresh( ?string $expected_refresh_token = null ): string {
+	public function refresh( ?string $expected_refresh_token = null, bool $treat_as_expired = false ): string {
 		if ( null === $this->store->get() ) {
 			throw new OAuthException( 'not_connected', 'The ChatGPT provider is not connected. Visit Settings > ChatGPT to sign in.' );
 		}
@@ -113,7 +115,7 @@ class TokenRefresher {
 		$expected = $expected_refresh_token ?? $this->store->get_refresh_token();
 
 		if ( ! $this->acquire_lock() ) {
-			return $this->wait_for_other_refresh();
+			return $this->wait_for_other_refresh( $treat_as_expired );
 		}
 		try {
 			// Another process may have rotated the record while this one waited.
@@ -238,15 +240,16 @@ class TokenRefresher {
 	}
 
 	/**
-	 * Waits for the lock holder when the current access token is already expired.
+	 * Waits for the lock holder when the current access token is expired or rejected.
 	 *
 	 * @since 0.2.0
 	 *
+	 * @param bool $treat_as_expired True when the API rejected a token the clock still accepts.
 	 * @return string BUSY when the token is still valid, ALREADY_ROTATED after the wait.
-	 * @throws OAuthException When the token is still expired after the wait.
+	 * @throws OAuthException When the token is still expired or unchanged after the wait.
 	 */
-	private function wait_for_other_refresh(): string {
-		if ( ! $this->is_expired() ) {
+	private function wait_for_other_refresh( bool $treat_as_expired ): string {
+		if ( ! $treat_as_expired && ! $this->is_expired() ) {
 			return self::BUSY;
 		}
 		$before = $this->store->get_access_token();
@@ -258,7 +261,7 @@ class TokenRefresher {
 			}
 		}
 		wp_cache_delete( TokenStore::OPTION_NAME, 'options' );
-		if ( $this->is_expired() ) {
+		if ( $this->is_expired() || ( $treat_as_expired && $this->store->get_access_token() === $before ) ) {
 			throw new OAuthException( 'refresh_in_progress', 'ChatGPT tokens are being refreshed by another request. Try again in a moment.' );
 		}
 		return self::ALREADY_ROTATED;
