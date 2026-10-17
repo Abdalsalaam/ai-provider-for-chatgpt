@@ -7,6 +7,7 @@
 
 use Halawa\ChatGptAiProvider\Authentication\ChatGptAccountAuthentication;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
+use Halawa\ChatGptAiProvider\Cache\TransientCache;
 use Halawa\ChatGptAiProvider\Metadata\ChatGptModelMetadataDirectory;
 use WordPress\AiClient\Messages\Enums\ModalityEnum;
 use WordPress\AiClient\Providers\Http\HttpTransporterFactory;
@@ -177,5 +178,91 @@ class Test_Model_Metadata_Directory extends Test_Case {
 		$models = $this->directory( Api_Test_Helpers::connected_store( array( 'needs_signin' => true ) ) )->listModelMetadata();
 		$this->assertSame( ChatGptModelMetadataDirectory::BUNDLED_MODELS, array_map( static fn ( $m ) => $m->getId(), $models ) );
 		$this->assertSame( array(), Http_Mock::requests() );
+	}
+
+	/**
+	 * Returns the ids of the models a fresh directory lists for $store.
+	 *
+	 * @param TokenStore $store Store.
+	 * @return list<string>
+	 */
+	private function listed_ids( TokenStore $store ): array {
+		return array_map( static fn ( $m ) => $m->getId(), $this->directory( $store )->listModelMetadata() );
+	}
+
+	/**
+	 * Two reads within the hour make one /v1/models request.
+	 */
+	public function test_model_list_is_cached_for_an_hour() {
+		$store = Api_Test_Helpers::connected_store();
+		Http_Mock::queue( Api_Test_Helpers::response( 200, self::fixture( 'models.json' ) ) );
+
+		$first  = $this->listed_ids( $store );
+		$second = $this->listed_ids( $store );
+
+		$this->assertSame( array( 'gpt-6-luna', 'gpt-5.6-terra', 'gpt-5.6-luna' ), $first );
+		$this->assertSame( $first, $second );
+		$this->assertCount( 1, Http_Mock::requests() );
+		$timeout = (int) get_option( '_transient_timeout_' . ChatGptModelMetadataDirectory::CACHE_KEY );
+		$this->assertGreaterThan( time() + HOUR_IN_SECONDS - 60, $timeout );
+		$this->assertLessThanOrEqual( time() + HOUR_IN_SECONDS, $timeout );
+	}
+
+	/**
+	 * Clearing the model cache, as sign-in and disconnect do, makes the next read fetch again.
+	 */
+	public function test_clearing_the_model_cache_fetches_again() {
+		$store = Api_Test_Helpers::connected_store();
+		Http_Mock::queue( Api_Test_Helpers::response( 200, self::fixture( 'models.json' ) ) );
+		Http_Mock::queue( Api_Test_Helpers::response( 200, '{"models":[{"slug":"gpt-new","visibility":"list"}]}' ) );
+
+		$this->listed_ids( $store );
+		( new TransientCache() )->clear();
+
+		$this->assertSame( array( 'gpt-new' ), $this->listed_ids( $store ) );
+		$this->assertCount( 2, Http_Mock::requests() );
+	}
+
+	/**
+	 * The Developer tools cache action clears the model list too.
+	 */
+	public function test_developer_tools_cache_action_clears_the_model_list() {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$store = Api_Test_Helpers::connected_store();
+		Http_Mock::queue( Api_Test_Helpers::response( 200, self::fixture( 'models.json' ) ) );
+		Http_Mock::queue( Api_Test_Helpers::response( 200, '{"models":[{"slug":"gpt-new","visibility":"list"}]}' ) );
+
+		$this->listed_ids( $store );
+		$response = rest_get_server()->dispatch( new WP_REST_Request( 'DELETE', '/ai-provider-for-chatgpt/v1/cache' ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( 'gpt-new' ), $this->listed_ids( $store ) );
+		$this->assertCount( 2, Http_Mock::requests() );
+	}
+
+	/**
+	 * The bundled fallback after a failed request is not cached.
+	 */
+	public function test_bundled_fallback_is_not_cached() {
+		$store = Api_Test_Helpers::connected_store();
+		Http_Mock::queue( Api_Test_Helpers::response( 503, '{"detail":"Direct routing unavailable"}' ) );
+		Http_Mock::queue( Api_Test_Helpers::response( 200, self::fixture( 'models.json' ) ) );
+
+		$this->assertSame( ChatGptModelMetadataDirectory::BUNDLED_MODELS, $this->listed_ids( $store ) );
+		$this->assertSame( array( 'gpt-6-luna', 'gpt-5.6-terra', 'gpt-5.6-luna' ), $this->listed_ids( $store ) );
+		$this->assertCount( 2, Http_Mock::requests() );
+	}
+
+	/**
+	 * A record that needs a new sign-in lists the last known models without a request.
+	 */
+	public function test_session_ended_lists_the_last_known_models() {
+		$store = Api_Test_Helpers::connected_store();
+		Http_Mock::queue( Api_Test_Helpers::response( 200, '{"models":[{"slug":"gpt-known","visibility":"list"}]}' ) );
+		$this->listed_ids( $store );
+		$store->mark_needs_signin();
+
+		$this->assertSame( array( 'gpt-known' ), $this->listed_ids( $store ) );
+		$this->assertCount( 1, Http_Mock::requests() );
 	}
 }

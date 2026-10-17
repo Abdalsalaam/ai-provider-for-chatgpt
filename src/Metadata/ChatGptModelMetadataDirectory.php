@@ -41,6 +41,17 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	public const BUNDLED_MODELS = array( 'gpt-6-luna', 'gpt-5.6-terra', 'gpt-5.6-luna' );
 
 	/**
+	 * Transient holding the last listed models for an hour.
+	 *
+	 * The ai_client_ prefix makes the plugin's cache clears remove it too.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @var string
+	 */
+	public const CACHE_KEY = 'ai_client_chatgpt_models';
+
+	/**
 	 * Account authentication used for every request.
 	 *
 	 * @var ChatGptAccountAuthentication|null
@@ -95,26 +106,35 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 *
 	 * Authentication runs first and is not caught, so a site that is not
 	 * connected reports the provider as not configured. A record that needs a
-	 * new sign-in lists the bundled models without calling OpenAI, so model
-	 * selection succeeds and the request itself reports the ended session.
+	 * new sign-in lists the last known or bundled models without calling
+	 * OpenAI, so model selection succeeds and the request itself reports the
+	 * ended session. A listed result is kept for an hour in CACHE_KEY.
 	 *
 	 * @since 1.0.0
 	 *
 	 * @return array<string, ModelMetadata> Models keyed by id.
 	 */
 	protected function sendListModelsRequest(): array {
-		$store = new TokenStore();
+		$store  = new TokenStore();
+		$cached = self::cached_entries();
 		if ( null !== $store->get() && $store->needs_signin() ) {
-			return self::metadata_map( self::bundled_entries() );
+			return self::metadata_map( $cached ?? self::bundled_entries() );
 		}
 		$request = $this->getRequestAuthentication()->authenticateRequest(
 			$this->createRequest( HttpMethodEnum::GET(), 'models' )
 		);
-		$models  = array();
+		if ( null !== $cached ) {
+			return self::metadata_map( $cached );
+		}
+		$models = array();
 		try {
 			$response = $this->getHttpTransporter()->send( $request );
 			$this->throwIfNotSuccessful( $response );
-			$models = $this->parseResponseToModelMetadataList( $response );
+			$listed = self::listed_entries( $response->getData() );
+			if ( array() !== $listed ) {
+				set_transient( self::CACHE_KEY, $listed, HOUR_IN_SECONDS );
+			}
+			$models = array_map( array( self::class, 'to_metadata' ), $listed );
 		} catch ( Throwable $e ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Diagnostic under WP_DEBUG only.
@@ -130,6 +150,29 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 			$map[ $model->getId() ] = $model;
 		}
 		return $map;
+	}
+
+	/**
+	 * Returns the cached listed entries, or null when there are none.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @return list<array{id: string, name: string, listed: bool, image: bool}>|null
+	 */
+	private static function cached_entries(): ?array {
+		// The cache clears delete rows with SQL, so drop this request's copy first.
+		wp_cache_delete( '_transient_' . self::CACHE_KEY, 'options' );
+		wp_cache_delete( '_transient_timeout_' . self::CACHE_KEY, 'options' );
+		$cached = get_transient( self::CACHE_KEY );
+		if ( ! is_array( $cached ) || array() === $cached ) {
+			return null;
+		}
+		foreach ( $cached as $entry ) {
+			if ( ! is_array( $entry ) || ! is_string( $entry['id'] ?? null ) || ! is_string( $entry['name'] ?? null ) || ! is_bool( $entry['image'] ?? null ) ) {
+				return null;
+			}
+		}
+		return array_values( $cached );
 	}
 
 	/**
@@ -157,13 +200,26 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 * @return list<ModelMetadata> Listed models in server order.
 	 */
 	protected function parseResponseToModelMetadataList( Response $response ): array {
-		$listed = array_filter(
-			self::normalise_entries( $response->getData() ),
-			static function ( array $entry ): bool {
-				return $entry['listed'];
-			}
+		return array_map( array( self::class, 'to_metadata' ), self::listed_entries( $response->getData() ) );
+	}
+
+	/**
+	 * Returns the listed entries of a /models body, in server order.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param mixed $data The decoded body.
+	 * @return list<array{id: string, name: string, listed: bool, image: bool}>
+	 */
+	private static function listed_entries( $data ): array {
+		return array_values(
+			array_filter(
+				self::normalise_entries( $data ),
+				static function ( array $entry ): bool {
+					return $entry['listed'];
+				}
+			)
 		);
-		return array_values( array_map( array( self::class, 'to_metadata' ), $listed ) );
 	}
 
 	/**
