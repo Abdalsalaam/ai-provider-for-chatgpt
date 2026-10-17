@@ -23,6 +23,7 @@ final class Upgrade {
 	public const VERSION_OPTION = 'halawa_chatgpt_version';
 	public const NOTICE_OPTION  = 'halawa_chatgpt_upgrade_notice';
 	public const DISMISS_ACTION = 'halawa_chatgpt_dismiss_upgrade_notice';
+	public const NOTICE_ID      = 'halawa-chatgpt-upgrade-notice';
 
 	/**
 	 * Token store.
@@ -53,6 +54,7 @@ final class Upgrade {
 		add_action( 'admin_init', array( $this, 'on_admin_init' ) );
 		add_action( 'admin_notices', array( $this, 'render_notice' ) );
 		add_action( 'admin_post_' . self::DISMISS_ACTION, array( $this, 'dismiss' ) );
+		add_action( 'wp_ajax_' . self::DISMISS_ACTION, array( $this, 'dismiss_ajax' ) );
 	}
 
 	/**
@@ -111,13 +113,40 @@ final class Upgrade {
 		}
 		$dismiss_url = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::DISMISS_ACTION ), self::DISMISS_ACTION );
 		printf(
-			'<div class="notice notice-warning is-dismissible"><p>%1$s <a href="%2$s">%3$s</a> | <a href="%4$s">%5$s</a></p></div>',
+			'<div id="%6$s" class="notice notice-warning is-dismissible"><p>%1$s <a href="%2$s">%3$s</a> | <a href="%4$s">%5$s</a></p></div>',
 			esc_html__( 'AI Provider for ChatGPT now uses Sign in with ChatGPT. Connect your account again under Settings > ChatGPT.', 'ai-provider-for-chatgpt' ),
 			esc_url( admin_url( 'options-general.php?page=' . SettingsPage::MENU_SLUG ) ),
 			esc_html__( 'Connect now', 'ai-provider-for-chatgpt' ),
 			esc_url( $dismiss_url ),
-			esc_html__( 'Dismiss', 'ai-provider-for-chatgpt' )
+			esc_html__( 'Dismiss', 'ai-provider-for-chatgpt' ),
+			esc_attr( self::NOTICE_ID )
 		);
+		// The core close button only hides the notice, so it also clears the flag on the server.
+		wp_print_inline_script_tag(
+			sprintf(
+				'(function(){var n=document.getElementById(%1$s);if(!n){return;}n.addEventListener("click",function(e){if(!e.target.closest(".notice-dismiss")){return;}var d=new FormData();d.append("action",%2$s);d.append("_ajax_nonce",%3$s);fetch(%4$s,{method:"POST",body:d,credentials:"same-origin"});});})();',
+				wp_json_encode( self::NOTICE_ID ),
+				wp_json_encode( self::DISMISS_ACTION ),
+				wp_json_encode( wp_create_nonce( self::DISMISS_ACTION ) ),
+				wp_json_encode( admin_url( 'admin-ajax.php' ) )
+			)
+		);
+	}
+
+	/**
+	 * Clears the notice flag from the notice's close button.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return void
+	 */
+	public function dismiss_ajax(): void {
+		check_ajax_referer( self::DISMISS_ACTION );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( null, 403 );
+		}
+		delete_option( self::NOTICE_OPTION );
+		wp_send_json_success();
 	}
 
 	/**
