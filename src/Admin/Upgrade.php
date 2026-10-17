@@ -79,7 +79,7 @@ final class Upgrade {
 			return false;
 		}
 
-		// Codex-era and unreadable records cannot be used, so the admin signs in again.
+		// Records from 0.1.x and unreadable ones cannot be used, so the admin signs in again.
 		if ( $this->store->has_legacy_record() ) {
 			$this->store->clear();
 			( new TransientCache() )->clear();
