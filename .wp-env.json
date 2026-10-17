@@ -1,0 +1,11 @@
+{
+	"core": "WordPress/WordPress#master",
+	"plugins": [ "." ],
+	"env": {
+		"tests": {
+			"config": {
+				"WP_DEBUG": true
+			}
+		}
+	}
+}
