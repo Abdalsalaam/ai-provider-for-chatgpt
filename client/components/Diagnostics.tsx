@@ -96,10 +96,7 @@ export function Diagnostics() {
 					disabled={ probe.loading }
 					onClick={ runRemoteProbe }
 				>
-					{ __(
-						'Probe ChatGPT /models directly',
-						'ai-provider-for-chatgpt'
-					) }
+					{ __( 'Probe OpenAI models', 'ai-provider-for-chatgpt' ) }
 				</Button>
 			</p>
 
