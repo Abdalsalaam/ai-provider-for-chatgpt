@@ -5,12 +5,16 @@
 import apiFetch from '@wordpress/api-fetch';
 
 import type {
+	CacheClearResult,
 	ConnectionStatus,
 	Diagnostics,
+	DisconnectResult,
+	RefreshResult,
 	RemoteModelsProbe,
-	CacheClearResult,
-	PairingToken,
+	SignInStart,
 } from '../types';
+
+export type { SignInStart } from '../types';
 
 const NS = 'ai-provider-for-chatgpt/v1';
 
@@ -22,31 +26,31 @@ export const api = {
 		} );
 	},
 
-	importBundle( bundle: string ): Promise< ConnectionStatus > {
-		return apiFetch< ConnectionStatus >( {
-			path: `/${ NS }/connection`,
+	startSignIn(): Promise< SignInStart > {
+		return apiFetch< SignInStart >( {
+			path: `/${ NS }/connection/sign-in`,
 			method: 'POST',
-			data: { bundle },
 		} );
 	},
 
-	disconnect(): Promise< ConnectionStatus > {
+	completeSignIn( callbackUrl: string ): Promise< ConnectionStatus > {
 		return apiFetch< ConnectionStatus >( {
+			path: `/${ NS }/connection/callback`,
+			method: 'POST',
+			data: { callback_url: callbackUrl },
+		} );
+	},
+
+	disconnect(): Promise< DisconnectResult > {
+		return apiFetch< DisconnectResult >( {
 			path: `/${ NS }/connection`,
 			method: 'DELETE',
 		} );
 	},
 
-	refresh(): Promise< ConnectionStatus > {
-		return apiFetch< ConnectionStatus >( {
+	refresh(): Promise< RefreshResult > {
+		return apiFetch< RefreshResult >( {
 			path: `/${ NS }/connection/refresh`,
-			method: 'POST',
-		} );
-	},
-
-	issuePairing(): Promise< PairingToken > {
-		return apiFetch< PairingToken >( {
-			path: `/${ NS }/connection/pairing`,
 			method: 'POST',
 		} );
 	},
