@@ -106,8 +106,8 @@ This plugin connects to services operated by OpenAI, L.L.C. so the WordPress AI 
 * **`https://auth.openai.com/api/accounts/authorize`** is opened in the administrator's browser when they click **Continue with ChatGPT**. The address carries the client id, a stable id for this site, the requested permissions, a one-time state and nonce, and a PKCE challenge. On the first sign-in it also carries the agent name "AI Provider for ChatGPT" (not when the `CHATGPT_OAUTH_CLIENT_ID` constant is set). On a new sign-in for an existing connection it carries the connected account's email and ID token as hints.
 * **`POST https://auth.openai.com/api/accounts/oauth/token`** is called from your server when the administrator pastes the sign-in address (sends the client id, the one-time code, the PKCE verifier, the redirect address and the API resource), and when the access token is due for renewal, including a weekly scheduled refresh (sends the client id, the refresh token and the API resource). No prompt or user content is sent.
 * **`GET https://auth.openai.com/.well-known/jwks.json`** is called from your server to fetch OpenAI's public keys and verify the ID token at sign-in. Nothing about your site or account is sent. The keys are cached for 24 hours.
-* **`POST https://auth.openai.com/api/accounts/oauth/revoke`** is called when the administrator clicks **Disconnect** (sends the client id and the refresh token).
-* **`GET https://api.openai.com/v1/models`** is called with the access token to list the models your plan offers, at most once an hour (the list is cached on your site) and from the diagnostics probe. No prompt or user content is sent.
+* **`POST https://auth.openai.com/api/accounts/oauth/revoke`** is called when the administrator clicks **Disconnect** or **Use a different ChatGPT account**, and once when the plugin is deleted while still connected (sends the client id and the refresh token). On deletion the call is best effort: if it fails, the plugin's data is removed anyway.
+* **`GET https://api.openai.com/v1/models`** is called with the access token to list the models your plan offers, usually at most once an hour (the list is cached on your site and fetched again after a sign-in, a disconnect or Clear cached model list) and from the diagnostics probe. No prompt or user content is sent.
 * **`POST https://api.openai.com/v1/responses`** is called whenever a plugin or theme on your site uses the AI Client with a ChatGPT model. The request carries the access token and what the calling code supplies: the prompt and conversation, system instructions, tool definitions, JSON schema, and any attached images or files.
 
 These services are provided by OpenAI. By connecting an account and using this provider you agree to OpenAI's terms:
@@ -125,19 +125,8 @@ These services are provided by OpenAI. By connecting an account and using this p
 
 = 1.0.0 =
 
-* Connect with Sign in with ChatGPT: click Continue with ChatGPT, approve, and paste the address you land on. No command line tool and no file to copy.
-* Requests go to api.openai.com with the client id OpenAI issues to this site at sign-in, billed to your ChatGPT Plus, Pro or Go plan.
-* Removed the Codex client id, the Codex backend, the auth.json import and the pairing command line tool.
-* Existing connections must sign in again after updating; the plugin shows a notice.
-* Free ChatGPT accounts are no longer eligible, because OpenAI grants plan usage only to Plus, Pro and Go.
-* New settings screen that explains each step before you sign in, with Paste from clipboard and an Open ChatGPT sign-in button if the sign-in tab did not open.
-* A privacy note on the settings screen: the plugin runs only on your website and the plugin developer has no access to your account.
-* Added a weekly token refresh and a link to manage usage in ChatGPT.
-* Disconnect revokes the connection at OpenAI and keeps the registration, so signing in again reuses it. Use a different ChatGPT account forgets it to switch accounts.
-* When the ChatGPT session ends, AI features show "ChatGPT session ended. Sign in again under Settings > ChatGPT." instead of a model error.
-* The model list is cached for an hour instead of being fetched on every request.
-* Renamed the listing to "AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed"; the plugin slug is unchanged.
-* Uninstall now removes every option, transient and scheduled event the plugin creates.
+* Connect with Sign in with ChatGPT on a guided settings screen: no command line tool, no API key, billed to your ChatGPT Plus, Pro or Go plan.
+* Existing connections must sign in again after updating, and Free ChatGPT accounts are no longer eligible.
 
 = 0.1.4 =
 
