@@ -187,6 +187,48 @@ class Test_Token_Refresher extends Test_Case {
 	}
 
 	/**
+	 * A rejected token that looks valid waits on a busy lock instead of returning BUSY.
+	 */
+	public function test_treat_as_expired_waits_on_busy_lock() {
+		$this->save_expiring_in( 3000 );
+		$this->insert_lock( time() );
+		$refresher = new class( $this->store ) extends TokenRefresher {
+			/**
+			 * Pauses seen.
+			 *
+			 * @var int
+			 */
+			public $pauses = 0;
+
+			/**
+			 * Simulates the lock holder finishing after the third poll.
+			 *
+			 * @param int $milliseconds Ignored.
+			 */
+			protected function pause( int $milliseconds ): void {
+				++$this->pauses;
+				if ( 3 === $this->pauses ) {
+					( new TokenStore() )->update(
+						array(
+							'access_token'  => 'at_2',
+							'refresh_token' => 'rt_2',
+						)
+					);
+				}
+			}
+		};
+
+		$this->assertSame( TokenRefresher::BUSY, ( new TokenRefresher( $this->store ) )->refresh( 'rt_1' ) );
+		$this->assertSame( TokenRefresher::ALREADY_ROTATED, $refresher->refresh( 'rt_1', true ) );
+		$this->assertSame( 3, $refresher->pauses );
+		$this->assertCount( 0, Http_Mock::requests() );
+		$this->assertSame( 'at_2', $this->store->get_access_token() );
+
+		$this->expectException( OAuthException::class );
+		$refresher->refresh( 'rt_2', true );
+	}
+
+	/**
 	 * Busy lock and a token still expired after 5 s: refresh_in_progress.
 	 */
 	public function test_busy_lock_times_out_with_refresh_in_progress() {
@@ -364,6 +406,22 @@ class Test_Token_Refresher extends Test_Case {
 			$this->assertSame( 'not_connected', $e->getErrorCode() );
 		}
 		$this->assertCount( 0, Http_Mock::requests() );
+	}
+
+	/**
+	 * A record without a refresh token is not_connected after the lock.
+	 */
+	public function test_record_without_refresh_token_is_not_connected() {
+		$this->store->save( OAuth_Test_Helpers::record( array( 'refresh_token' => '' ) ) );
+		$this->assertNotNull( $this->store->get() );
+		try {
+			( new TokenRefresher( $this->store ) )->refresh();
+			$this->fail( 'Expected not_connected' );
+		} catch ( OAuthException $e ) {
+			$this->assertSame( 'not_connected', $e->getErrorCode() );
+		}
+		$this->assertCount( 0, Http_Mock::requests() );
+		$this->assertNull( $this->lock_value() );
 	}
 
 	/**

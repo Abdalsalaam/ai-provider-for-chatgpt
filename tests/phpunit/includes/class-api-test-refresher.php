@@ -41,6 +41,13 @@ class Api_Test_Refresher extends TokenRefresher {
 	public $on_refresh;
 
 	/**
+	 * The treat_as_expired argument of each refresh() call.
+	 *
+	 * @var bool[]
+	 */
+	public $forced_calls = array();
+
+	/**
 	 * {@inheritDoc}
 	 */
 	public function is_due(): bool {
@@ -58,10 +65,12 @@ class Api_Test_Refresher extends TokenRefresher {
 	 * {@inheritDoc}
 	 *
 	 * @param string|null $expected_refresh_token Refresh token the caller read.
+	 * @param bool        $treat_as_expired       Recorded in $forced_calls.
 	 * @return string Always REFRESHED; the authentication layer ignores it.
 	 */
-	public function refresh( ?string $expected_refresh_token = null ): string {
-		$this->calls[] = $expected_refresh_token;
+	public function refresh( ?string $expected_refresh_token = null, bool $treat_as_expired = false ): string {
+		$this->calls[]        = $expected_refresh_token;
+		$this->forced_calls[] = $treat_as_expired;
 		if ( null !== $this->on_refresh ) {
 			call_user_func( $this->on_refresh );
 		}
