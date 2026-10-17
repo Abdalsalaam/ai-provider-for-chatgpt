@@ -1,4 +1,4 @@
-=== AI Provider for ChatGPT - Connect Your ChatGPT Plan to WordPress AI ===
+=== AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed ===
 Contributors: abdalsalaam
 Tags: chatgpt, openai, ai, connector, ai-provider
 Requires at least: 6.9
