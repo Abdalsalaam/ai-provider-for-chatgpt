@@ -29,6 +29,10 @@ export function App() {
 	const [ clearingCache, setClearingCache ] = useState( false );
 
 	const isConnected = !! data?.connected;
+	// Changes whenever a connect, disconnect, forget or refresh changes the status.
+	const statusKey = data
+		? [ data.connected, data.client_id, data.last_refresh ].join( '|' )
+		: undefined;
 
 	const runClearCache = async () => {
 		setClearingCache( true );
@@ -157,7 +161,7 @@ export function App() {
 							</Card.Title>
 						</Card.Header>
 						<Card.Content>
-							<Diagnostics />
+							<Diagnostics statusKey={ statusKey } />
 						</Card.Content>
 					</Card.Root>
 				</Stack>
