@@ -194,6 +194,28 @@ class Test_Upgrade extends Test_Case {
 	}
 
 	/**
+	 * Once the admin has signed in again, the notice is cleared instead of shown.
+	 */
+	public function test_notice_clears_after_new_sign_in() {
+		update_option( Upgrade::NOTICE_OPTION, 1, false );
+		( new TokenStore() )->save(
+			array(
+				'client_id'     => 'oaiapp_test',
+				'subject'       => 'user_test',
+				'scopes'        => array( 'chatgpt.tokens.use.direct' ),
+				'access_token'  => 'fake-access',
+				'refresh_token' => 'fake-refresh',
+				'id_token'      => 'fake.id.token',
+				'expires_at'    => time() + 3600,
+			)
+		);
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+
+		$this->assertSame( '', get_echo( array( new Upgrade(), 'render_notice' ) ) );
+		$this->assertSame( 'absent', get_option( Upgrade::NOTICE_OPTION, 'absent' ) );
+	}
+
+	/**
 	 * Dismissing with a valid nonce clears the flag.
 	 */
 	public function test_dismiss_clears_the_flag() {

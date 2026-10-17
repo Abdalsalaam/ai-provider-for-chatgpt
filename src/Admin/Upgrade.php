@@ -104,6 +104,11 @@ final class Upgrade {
 		if ( ! current_user_can( 'manage_options' ) || ! get_option( self::NOTICE_OPTION ) ) {
 			return;
 		}
+		// A new sign-in answers the notice, so it is not shown again.
+		if ( null !== $this->store->get() ) {
+			delete_option( self::NOTICE_OPTION );
+			return;
+		}
 		$dismiss_url = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::DISMISS_ACTION ), self::DISMISS_ACTION );
 		printf(
 			'<div class="notice notice-warning is-dismissible"><p>%1$s <a href="%2$s">%3$s</a> | <a href="%4$s">%5$s</a></p></div>',
