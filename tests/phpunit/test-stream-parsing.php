@@ -84,6 +84,12 @@ class Test_Stream_Parsing extends Test_Case {
 							'text' => 'Thinking about weather',
 						),
 					),
+					'content' => array(
+						array(
+							'type' => 'reasoning_text',
+							'text' => 'secret chain',
+						),
+					),
 				),
 			)
 		) . Api_Test_Helpers::sse_event(
@@ -114,6 +120,10 @@ class Test_Stream_Parsing extends Test_Case {
 		$this->assertSame( 'Checking the weather.', $parts[0]->getText() );
 		$this->assertSame( 'get_weather', $parts[1]->getFunctionCall()->getName() );
 		$this->assertTrue( $result->getCandidates()[0]->getFinishReason()->isToolCalls() );
+		foreach ( $parts as $part ) {
+			$this->assertStringNotContainsString( 'secret chain', (string) $part->getText() );
+			$this->assertStringNotContainsString( 'Thinking about weather', (string) $part->getText() );
+		}
 	}
 
 	/**
