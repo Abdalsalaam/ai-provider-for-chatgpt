@@ -76,7 +76,7 @@ export function useSignIn(
 			setDeadline( localDeadline( next.expires_at, receivedAt ) );
 			setNow( receivedAt );
 			setNeedsRestart( false );
-			window.open( next.authorize_url, '_blank', 'noopener' );
+			window.open( next.authorize_url, '_blank', 'noopener,noreferrer' );
 		} catch ( err ) {
 			setError( {
 				code: errorCode( err ),

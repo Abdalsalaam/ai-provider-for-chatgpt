@@ -14,7 +14,7 @@ const ELIGIBILITY_URL =
 // Reopens the current attempt's sign-in page without starting a new attempt.
 function reopenSignIn( start: SignInStart | null ) {
 	if ( start ) {
-		window.open( start.authorize_url, '_blank', 'noopener' );
+		window.open( start.authorize_url, '_blank', 'noopener,noreferrer' );
 	}
 }
 
