@@ -41,6 +41,20 @@ use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGenerationModelInterface {
 
 	/**
+	 * Custom options the route rejects or that this plugin never sends.
+	 *
+	 * @var list<string>
+	 */
+	private const FORBIDDEN_OPTIONS = array( 'temperature', 'top_p', 'include', 'metadata', 'user', 'truncation', 'previous_response_id' );
+
+	/**
+	 * Body keys the plugin sets itself and custom options may not replace.
+	 *
+	 * @var list<string>
+	 */
+	private const RESERVED_OPTIONS = array( 'model', 'input', 'store', 'stream', 'instructions', 'tools', 'tool_choice', 'parallel_tool_calls', 'prompt_cache_key', 'text', 'max_output_tokens' );
+
+	/**
 	 * Account authentication used for every request.
 	 *
 	 * @var ChatGptAccountAuthentication|null
@@ -313,63 +327,44 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	}
 
 	/**
-	 * Builds the request body for the Responses API.
+	 * Builds the /responses request body.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @param array $prompt The prompt messages.
 	 * @return array<string, mixed> The request body.
-	 * @throws InvalidArgumentException When a message has an unsupported shape.
+	 * @throws InvalidArgumentException When a custom option is forbidden or reserved.
 	 */
 	protected function prepareGenerateTextParams( array $prompt ): array {
-		$config = $this->getConfig();
-
-		// The Codex backend rejects requests that are missing fields the
-		// Codex CLI always sends. Defaults below mirror
-		// codex-rs/core/src/client.rs build_responses_request().
-		$instructions = $config->getSystemInstruction() ?? '';
-		$function_declarations = $config->getFunctionDeclarations();
-		$tool_names = array();
-		if ( is_array( $function_declarations ) ) {
-			foreach ( $function_declarations as $fn ) {
-				$tool_names[] = $fn->getName();
-			}
-			sort( $tool_names );
+		$config       = $this->getConfig();
+		$instructions = (string) ( $config->getSystemInstruction() ?? '' );
+		$declarations = $config->getFunctionDeclarations() ?? array();
+		$tool_names   = array();
+		foreach ( $declarations as $declaration ) {
+			$tool_names[] = $declaration->getName();
 		}
-		// prompt_cache_key must be stable across requests with the same prefix
-		// so the Codex backend can hit its prompt cache; derive it from
-		// model + instructions + tool names rather than a fresh UUID.
-		$cache_key = hash(
-			'sha256',
-			$this->metadata()->getId() . '|' . $instructions . '|' . implode( ',', $tool_names )
-		);
+		sort( $tool_names );
 
 		$params = array(
-			'model'               => $this->metadata()->getId(),
-			'instructions'        => $instructions,
-			'input'               => $this->prepareInputParam( $prompt ),
-			'tools'               => array(),
-			'tool_choice'         => 'auto',
-			'parallel_tool_calls' => false,
-			'store'               => false,
-			'stream'              => true, // Codex backend requires SSE streaming.
-			'include'             => array(),
-			'prompt_cache_key'    => $cache_key,
+			'model'            => $this->metadata()->getId(),
+			'input'            => $this->prepareInputParam( $prompt ),
+			'store'            => false,
+			'stream'           => true,
+			// A key stable for the same model, instructions and tools lets the prompt cache hit.
+			'prompt_cache_key' => hash( 'sha256', $this->metadata()->getId() . '|' . $instructions . '|' . implode( ',', $tool_names ) ),
 		);
-		// System instruction was already merged into $params above; remove it
-		// if empty so the Codex backend doesn't reject an empty-string value.
-		if ( '' === $params['instructions'] ) {
-			unset( $params['instructions'] );
+		if ( '' !== $instructions ) {
+			$params['instructions'] = $instructions;
 		}
-
-		// Codex rejects `temperature` and `top_p`. `max_output_tokens` is
-		// accepted (Codex CLI uses it via model defaults; the backend tolerates
-		// explicit values).
-		if ( $config->getMaxTokens() !== null ) {
+		if ( array() !== $declarations ) {
+			$params['tools']               = $this->prepareToolsParam( $declarations );
+			$params['tool_choice']         = 'auto';
+			$params['parallel_tool_calls'] = false;
+		}
+		if ( null !== $config->getMaxTokens() ) {
 			$params['max_output_tokens'] = $config->getMaxTokens();
 		}
-
-		if ( $config->getOutputMimeType() === 'application/json' && $config->getOutputSchema() ) {
+		if ( 'application/json' === $config->getOutputMimeType() && $config->getOutputSchema() ) {
 			$params['text'] = array(
 				'format' => array(
 					'type'   => 'json_schema',
@@ -380,23 +375,16 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 			);
 		}
 
-		if ( is_array( $function_declarations ) && array() !== $function_declarations ) {
-			$params['tools'] = $this->prepareToolsParam( $function_declarations );
-		}
-		// Cast to object so json_encode produces "[]" / "{}" as needed.
-		if ( array() === $params['tools'] ) {
-			$params['tools'] = array();
-		}
-
 		foreach ( $config->getCustomOptions() as $key => $value ) {
-			if ( isset( $params[ $key ] ) ) {
-				throw new InvalidArgumentException(
-					sprintf( 'The custom option "%s" conflicts with an existing parameter.', esc_html( (string) $key ) )
-				);
+			$key = (string) $key;
+			if ( in_array( $key, self::FORBIDDEN_OPTIONS, true ) ) {
+				throw new InvalidArgumentException( sprintf( 'The custom option "%s" is not accepted by ChatGPT.', esc_html( $key ) ) );
+			}
+			if ( in_array( $key, self::RESERVED_OPTIONS, true ) ) {
+				throw new InvalidArgumentException( sprintf( 'The custom option "%s" conflicts with an existing parameter.', esc_html( $key ) ) );
 			}
 			$params[ $key ] = $value;
 		}
-
 		return $params;
 	}
 
