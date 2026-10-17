@@ -23,6 +23,9 @@ class TokenRefresher {
 	public const DUE_WINDOW      = 300;
 	public const CRON_HOOK       = 'halawa_chatgpt_refresh_tokens';
 	public const CRON_RECURRENCE = 'weekly';
+	public const REFRESHED       = 'refreshed';
+	public const BUSY            = 'busy';
+	public const ALREADY_ROTATED = 'already_rotated';
 	public const TERMINAL_CODES  = array( 'invalid_grant', 'invalid_refresh_token', 'token_expired', 'refresh_token_expired', 'refresh_token_invalidated', 'refresh_token_reused' );
 
 	private const SESSION_ENDED        = 'ChatGPT session ended. Sign in again under Settings > ChatGPT.';
@@ -90,13 +93,17 @@ class TokenRefresher {
 	/**
 	 * Rotates the tokens unless another process holds the lock or already did.
 	 *
+	 * Returns REFRESHED after a rotation, BUSY when another request holds the lock
+	 * and the current token is still valid, and ALREADY_ROTATED when another
+	 * request rotated the token first.
+	 *
 	 * @since 0.1.0
 	 *
 	 * @param string|null $expected_refresh_token Refresh token the caller read, null to use the stored one.
-	 * @return void
+	 * @return string One of REFRESHED, BUSY or ALREADY_ROTATED.
 	 * @throws OAuthException When not connected, signed out, or the refresh fails.
 	 */
-	public function refresh( ?string $expected_refresh_token = null ): void {
+	public function refresh( ?string $expected_refresh_token = null ): string {
 		if ( null === $this->store->get() ) {
 			throw new OAuthException( 'not_connected', 'The ChatGPT provider is not connected. Visit Settings > ChatGPT to sign in.' );
 		}
@@ -106,16 +113,18 @@ class TokenRefresher {
 		$expected = $expected_refresh_token ?? $this->store->get_refresh_token();
 
 		if ( ! $this->acquire_lock() ) {
-			$this->wait_for_other_refresh();
-			return;
+			return $this->wait_for_other_refresh();
 		}
 		try {
 			// Another process may have rotated the record while this one waited.
 			wp_cache_delete( TokenStore::OPTION_NAME, 'options' );
 			$refresh_token = $this->store->get_refresh_token();
 			$client_id     = $this->store->get_client_id();
-			if ( null === $refresh_token || null === $client_id || $refresh_token !== $expected ) {
-				return;
+			if ( null === $refresh_token || null === $client_id ) {
+				throw new OAuthException( 'not_connected', 'The ChatGPT provider is not connected. Visit Settings > ChatGPT to sign in.' );
+			}
+			if ( $refresh_token !== $expected ) {
+				return self::ALREADY_ROTATED;
 			}
 
 			try {
@@ -141,6 +150,7 @@ class TokenRefresher {
 				$fields['scopes'] = $scopes;
 			}
 			$this->store->update( $fields );
+			return self::REFRESHED;
 		} finally {
 			$this->release_lock();
 		}
@@ -232,12 +242,12 @@ class TokenRefresher {
 	 *
 	 * @since 0.2.0
 	 *
-	 * @return void
+	 * @return string BUSY when the token is still valid, ALREADY_ROTATED after the wait.
 	 * @throws OAuthException When the token is still expired after the wait.
 	 */
-	private function wait_for_other_refresh(): void {
+	private function wait_for_other_refresh(): string {
 		if ( ! $this->is_expired() ) {
-			return;
+			return self::BUSY;
 		}
 		$before = $this->store->get_access_token();
 		for ( $i = 0; $i < self::WAIT_POLLS; $i++ ) {
@@ -251,6 +261,7 @@ class TokenRefresher {
 		if ( $this->is_expired() ) {
 			throw new OAuthException( 'refresh_in_progress', 'ChatGPT tokens are being refreshed by another request. Try again in a moment.' );
 		}
+		return self::ALREADY_ROTATED;
 	}
 
 	/**

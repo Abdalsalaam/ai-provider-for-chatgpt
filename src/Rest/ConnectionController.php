@@ -223,17 +223,15 @@ class ConnectionController extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function refresh() {
-		$before = $this->store->get_refresh_token();
 		try {
-			( new TokenRefresher( $this->store, $this->endpoint ) )->refresh();
+			$result = ( new TokenRefresher( $this->store, $this->endpoint ) )->refresh();
 		} catch ( Throwable $e ) {
 			return $this->error( $e );
 		}
-		// A successful refresh always rotates the token; an unchanged one means the lock was busy.
-		wp_cache_delete( TokenStore::OPTION_NAME, 'options' );
-		if ( $this->store->get_refresh_token() === $before ) {
+		if ( TokenRefresher::BUSY === $result ) {
 			return $this->error( new OAuthException( 'refresh_in_progress', 'ChatGPT tokens are being refreshed by another request. Try again in a moment.' ) );
 		}
+		wp_cache_delete( TokenStore::OPTION_NAME, 'options' );
 		return new WP_REST_Response(
 			array_merge( $this->status( false ), array( 'refreshed_at' => $this->store->get_last_refresh_timestamp() ) ),
 			200
