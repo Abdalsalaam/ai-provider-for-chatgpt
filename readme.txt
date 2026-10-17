@@ -69,7 +69,7 @@ ChatGPT Plus, Pro and Go accounts. OpenAI grants plan usage to other apps only o
 
 = How do I connect a different ChatGPT account? =
 
-Disconnect keeps the site's registration with OpenAI, so the next sign-in reuses it and must use the same ChatGPT account. To switch accounts, click **Use a different ChatGPT account** on **Settings > ChatGPT**. It revokes any stored tokens and deletes the registration (the issued client id and the account's id, email and name). Then sign in with the other account.
+Disconnect keeps the site's registration with OpenAI, so the next sign-in reuses it and must use the same ChatGPT account. To switch accounts, click **Use a different ChatGPT account** on **Settings > ChatGPT**. It revokes any stored tokens and deletes the site's copy of the registration (the issued client id and the account's id, email and name); the app stays listed in your ChatGPT settings, where you can remove it. Then sign in with the other account.
 
 = Where do I manage usage? =
 
