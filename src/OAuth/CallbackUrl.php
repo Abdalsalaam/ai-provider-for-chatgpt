@@ -37,24 +37,24 @@ final class CallbackUrl {
 	public static function parse( string $url, string $expected_redirect_uri ): array {
 		$url = trim( $url );
 		if ( '' === $url || strlen( $url ) > self::MAX_LENGTH || false !== strpos( $url, '#' ) ) {
-			throw new InvalidArgumentException( esc_html( self::WRONG_PAGE ) );
+			throw new InvalidArgumentException( self::WRONG_PAGE ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 
 		$actual   = wp_parse_url( $url );
 		$expected = wp_parse_url( $expected_redirect_uri );
 		if ( ! is_array( $actual ) || ! is_array( $expected ) || ! self::same_endpoint( $actual, $expected ) ) {
-			throw new InvalidArgumentException( esc_html( self::WRONG_PAGE ) );
+			throw new InvalidArgumentException( self::WRONG_PAGE ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 
 		$params = self::query_params( (string) ( $actual['query'] ?? '' ) );
 		$state  = $params['state'] ?? '';
 		if ( '' === $state ) {
-			throw new InvalidArgumentException( esc_html( self::MISSING_STATE ) );
+			throw new InvalidArgumentException( self::MISSING_STATE ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 		$error = isset( $params['error'] ) && '' !== $params['error'] ? $params['error'] : null;
 		$code  = $params['code'] ?? '';
 		if ( null === $error && '' === $code ) {
-			throw new InvalidArgumentException( esc_html( self::MISSING_CODE ) );
+			throw new InvalidArgumentException( self::MISSING_CODE ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 
 		return array(
@@ -120,7 +120,7 @@ final class CallbackUrl {
 			$parts = explode( '=', $pair, 2 );
 			$key   = urldecode( $parts[0] );
 			if ( array_key_exists( $key, $params ) ) {
-				throw new InvalidArgumentException( esc_html( self::REPEATED ) );
+				throw new InvalidArgumentException( self::REPEATED ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 			}
 			$params[ $key ] = urldecode( $parts[1] ?? '' );
 		}

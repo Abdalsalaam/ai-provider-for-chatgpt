@@ -101,7 +101,7 @@ final class TokenEndpoint {
 	private function tokens( array $fields ): array {
 		$response = $this->post( TOKEN_ENDPOINT, $fields );
 		if ( is_wp_error( $response ) ) {
-			throw new OAuthException( 'network_error', esc_html( 'Could not reach ChatGPT sign-in: ' . $response->get_error_message() ) );
+			throw new OAuthException( 'network_error', 'Could not reach ChatGPT sign-in: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 		$status     = (int) wp_remote_retrieve_response_code( $response );
 		$raw        = (string) wp_remote_retrieve_body( $response );
@@ -115,7 +115,7 @@ final class TokenEndpoint {
 		}
 		if ( $status < 200 || $status >= 300 ) {
 			list( $code, $message ) = self::error_parts( $data, $status );
-			throw new OAuthException( esc_html( $code ), esc_html( $message ), (int) $status, $request_id ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Status and request id are not output.
+			throw new OAuthException( $code, $message, (int) $status, $request_id ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 
 		foreach ( array( 'access_token', 'refresh_token', 'id_token' ) as $key ) {

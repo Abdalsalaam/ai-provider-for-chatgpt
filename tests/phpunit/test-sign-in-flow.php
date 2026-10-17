@@ -407,4 +407,25 @@ class Test_Sign_In_Flow extends Test_Case {
 		$this->assertFalse( $this->store->needs_signin() );
 		$this->assertSame( 'at_2', $this->store->get_access_token() );
 	}
+	/**
+	 * An exchange error description reaches the admin unescaped and once.
+	 */
+	public function test_exchange_error_message_is_plain_text() {
+		( new SignInFlow( $this->store ) )->start( self::USER );
+		Http_Mock::queue(
+			Http_Mock::json(
+				array(
+					'error'             => 'invalid_client',
+					'error_description' => "Client isn't allowed & blocked.",
+				),
+				401
+			)
+		);
+		try {
+			( new SignInFlow( $this->store ) )->complete( self::USER, $this->callback_url() );
+			$this->fail( 'Expected exchange_failed' );
+		} catch ( OAuthException $e ) {
+			$this->assertSame( "ChatGPT did not accept the sign-in: Client isn't allowed & blocked.", $e->getMessage() );
+		}
+	}
 }

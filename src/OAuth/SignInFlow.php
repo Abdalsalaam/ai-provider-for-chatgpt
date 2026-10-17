@@ -156,7 +156,7 @@ final class SignInFlow {
 		try {
 			$callback = CallbackUrl::parse( $callback_url, (string) $pending['redirect_uri'] );
 		} catch ( InvalidArgumentException $e ) {
-			throw new OAuthException( 'bad_callback', esc_html( $e->getMessage() ) );
+			throw new OAuthException( 'bad_callback', $e->getMessage() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 		if ( ! hash_equals( (string) $pending['state'], $callback['state'] ) ) {
 			throw new OAuthException( 'state_mismatch', 'That address belongs to a different sign-in attempt. Paste the address from the latest attempt, or start again.' );
@@ -169,7 +169,7 @@ final class SignInFlow {
 			$message = 'access_denied' === $callback['error']
 				? 'Sign-in was not completed: ChatGPT plan use was not allowed.'
 				: 'Sign-in was not completed (' . $callback['error'] . ').';
-			throw new OAuthException( 'access_denied', esc_html( $message ) );
+			throw new OAuthException( 'access_denied', $message ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 
 		$client_id = $this->issued_client_id( (string) $pending['client_id'], $callback['client_id'] );
@@ -180,13 +180,13 @@ final class SignInFlow {
 			$message = 'invalid_grant' === $e->getErrorCode()
 				? 'The sign-in link was already used or expired. Start again.'
 				: 'ChatGPT did not accept the sign-in: ' . $e->getMessage();
-			throw new OAuthException( 'exchange_failed', esc_html( $message ), $e->getHttpStatus(), $e->getRequestId() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Status and request id are not output.
+			throw new OAuthException( 'exchange_failed', $message, $e->getHttpStatus(), $e->getRequestId() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 
 		try {
 			$claims = $this->verifier->verify( $tokens['id_token'], $client_id, (string) $pending['nonce'] );
 		} catch ( OAuthException $e ) {
-			throw new OAuthException( 'id_token_invalid', esc_html( $e->getMessage() ) );
+			throw new OAuthException( 'id_token_invalid', $e->getMessage() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text message; REST and UI escape on output.
 		}
 
 		$scopes = array_values( array_filter( explode( ' ', $tokens['scope'] ) ) );
