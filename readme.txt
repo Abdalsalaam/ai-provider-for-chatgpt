@@ -12,9 +12,11 @@ Connect your ChatGPT Plus, Pro or Go plan to WordPress AI features with Sign in 
 
 == Description ==
 
-AI Provider for ChatGPT registers OpenAI with the WordPress AI Client. You connect it with Sign in with ChatGPT, OpenAI's sign-in for apps that use a ChatGPT plan, and requests are billed to that ChatGPT Plus, Pro or Go plan instead of a separate OpenAI API account.
+AI Provider for ChatGPT connects the AI features in WordPress to your own ChatGPT plan. You sign in with Sign in with ChatGPT, OpenAI's official sign-in for apps that use a ChatGPT plan, and AI requests from your site are billed to that ChatGPT Plus, Pro or Go plan. You do not need an OpenAI API key or a separate API account.
 
-Any plugin or theme that uses the AI Client can call ChatGPT models the same way it calls other providers.
+Any plugin or theme that uses the WordPress AI Client can call ChatGPT models the same way it calls other providers.
+
+Connecting takes about a minute and the settings screen walks you through every step. Your ChatGPT account stays private: the plugin runs only on your website, and the plugin developer never receives your sign-in, your tokens or anything you send.
 
 **Features:**
 
@@ -23,7 +25,9 @@ Any plugin or theme that uses the AI Client can call ChatGPT models the same way
 * Function calling and tool use
 * Structured output via JSON schema
 * Image input
-* Settings screen to connect, refresh and disconnect the account, with connection diagnostics
+* A guided settings screen: step-by-step instructions, Paste from clipboard, and a button to reopen the ChatGPT sign-in page
+* Refresh, disconnect and switch to a different ChatGPT account from the settings screen, with connection diagnostics
+* Clear messages when your ChatGPT session ends or your plan's usage limit is reached, with a link to manage usage in ChatGPT
 
 **Requirements:**
 
@@ -85,7 +89,7 @@ No. The plugin registers ChatGPT with the AI Client provider registry, so the AI
 
 = Does it support image generation? =
 
-No. This release covers text generation, chat, tool use, structured output and image input.
+No. OpenAI does not allow image generation for apps that use a ChatGPT plan through Sign in with ChatGPT; it is only available with an OpenAI API key. If your site needs image generation, use the official AI Provider for OpenAI plugin with an API key next to this one. This plugin covers text generation, chat, tool use, structured output and image input (reading images you attach).
 
 = Can the plugin developer see my ChatGPT account? =
 
@@ -103,7 +107,7 @@ This plugin connects to services operated by OpenAI, L.L.C. so the WordPress AI 
 * **`POST https://auth.openai.com/api/accounts/oauth/token`** is called from your server when the administrator pastes the sign-in address (sends the client id, the one-time code, the PKCE verifier, the redirect address and the API resource), and when the access token is due for renewal, including a weekly scheduled refresh (sends the client id, the refresh token and the API resource). No prompt or user content is sent.
 * **`GET https://auth.openai.com/.well-known/jwks.json`** is called from your server to fetch OpenAI's public keys and verify the ID token at sign-in. Nothing about your site or account is sent. The keys are cached for 24 hours.
 * **`POST https://auth.openai.com/api/accounts/oauth/revoke`** is called when the administrator clicks **Disconnect** (sends the client id and the refresh token).
-* **`GET https://api.openai.com/v1/models`** is called with the access token to list the models your plan offers, when the AI Client refreshes its model list and from the diagnostics probe. No prompt or user content is sent.
+* **`GET https://api.openai.com/v1/models`** is called with the access token to list the models your plan offers, at most once an hour (the list is cached on your site) and from the diagnostics probe. No prompt or user content is sent.
 * **`POST https://api.openai.com/v1/responses`** is called whenever a plugin or theme on your site uses the AI Client with a ChatGPT model. The request carries the access token and what the calling code supplies: the prompt and conversation, system instructions, tool definitions, JSON schema, and any attached images or files.
 
 These services are provided by OpenAI. By connecting an account and using this provider you agree to OpenAI's terms:
@@ -126,8 +130,13 @@ These services are provided by OpenAI. By connecting an account and using this p
 * Removed the Codex client id, the Codex backend, the auth.json import and the pairing command line tool.
 * Existing connections must sign in again after updating; the plugin shows a notice.
 * Free ChatGPT accounts are no longer eligible, because OpenAI grants plan usage only to Plus, Pro and Go.
+* New settings screen that explains each step before you sign in, with Paste from clipboard and an Open ChatGPT sign-in button if the sign-in tab did not open.
+* A privacy note on the settings screen: the plugin runs only on your website and the plugin developer has no access to your account.
 * Added a weekly token refresh and a link to manage usage in ChatGPT.
-* Disconnect revokes the connection at OpenAI and keeps the registration, so signing in again reuses it.
+* Disconnect revokes the connection at OpenAI and keeps the registration, so signing in again reuses it. Use a different ChatGPT account forgets it to switch accounts.
+* When the ChatGPT session ends, AI features show "ChatGPT session ended. Sign in again under Settings > ChatGPT." instead of a model error.
+* The model list is cached for an hour instead of being fetched on every request.
+* Renamed the listing to "AI Provider for ChatGPT - ChatGPT Connector, No API Key Needed"; the plugin slug is unchanged.
 * Uninstall now removes every option, transient and scheduled event the plugin creates.
 
 = 0.1.4 =
@@ -155,7 +164,7 @@ These services are provided by OpenAI. By connecting an account and using this p
 * ChatGPT text generation models with dynamic model discovery.
 * Function calling and structured (JSON schema) output.
 * Encrypted token storage with automatic refresh.
-* Default-model selection under Settings → ChatGPT.
+* Default-model selection under Settings > ChatGPT.
 
 == Upgrade Notice ==
 
