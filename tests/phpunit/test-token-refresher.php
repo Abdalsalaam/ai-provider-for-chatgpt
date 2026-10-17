@@ -106,7 +106,7 @@ class Test_Token_Refresher extends Test_Case {
 		);
 		Http_Mock::queue( Http_Mock::json( $response ) );
 
-		( new TokenRefresher( $this->store ) )->refresh( 'rt_1' );
+		$this->assertSame( TokenRefresher::REFRESHED, ( new TokenRefresher( $this->store ) )->refresh( 'rt_1' ) );
 
 		$this->assertSame( 'at_2', $this->store->get_access_token() );
 		$this->assertSame( 'rt_2', $this->store->get_refresh_token() );
@@ -126,7 +126,7 @@ class Test_Token_Refresher extends Test_Case {
 	public function test_refresh_when_not_due_still_rotates() {
 		$this->save_expiring_in( 3000 );
 		Http_Mock::queue( Http_Mock::json( OAuth_Test_Helpers::token_response() ) );
-		( new TokenRefresher( $this->store ) )->refresh();
+		$this->assertSame( TokenRefresher::REFRESHED, ( new TokenRefresher( $this->store ) )->refresh() );
 		$this->assertSame( 'at_2', $this->store->get_access_token() );
 		$this->assertCount( 1, Http_Mock::requests() );
 	}
@@ -138,7 +138,7 @@ class Test_Token_Refresher extends Test_Case {
 		$this->save_expiring_in( 60 );
 		$this->insert_lock( time() );
 
-		( new TokenRefresher( $this->store ) )->refresh( 'rt_1' );
+		$this->assertSame( TokenRefresher::BUSY, ( new TokenRefresher( $this->store ) )->refresh( 'rt_1' ) );
 
 		$this->assertCount( 0, Http_Mock::requests() );
 		$this->assertSame( 'rt_1', $this->store->get_refresh_token() );
@@ -179,7 +179,7 @@ class Test_Token_Refresher extends Test_Case {
 			}
 		};
 
-		$refresher->refresh( 'rt_1' );
+		$this->assertSame( TokenRefresher::ALREADY_ROTATED, $refresher->refresh( 'rt_1' ) );
 
 		$this->assertSame( 2, $refresher->pauses );
 		$this->assertCount( 0, Http_Mock::requests() );
@@ -228,7 +228,7 @@ class Test_Token_Refresher extends Test_Case {
 		$this->insert_lock( time() - TokenRefresher::LOCK_TTL - 1 );
 		Http_Mock::queue( Http_Mock::json( OAuth_Test_Helpers::token_response() ) );
 
-		( new TokenRefresher( $this->store ) )->refresh( 'rt_1' );
+		$this->assertSame( TokenRefresher::REFRESHED, ( new TokenRefresher( $this->store ) )->refresh( 'rt_1' ) );
 
 		$this->assertCount( 1, Http_Mock::requests() );
 		$this->assertSame( 'rt_2', $this->store->get_refresh_token() );
@@ -248,7 +248,7 @@ class Test_Token_Refresher extends Test_Case {
 			)
 		);
 
-		( new TokenRefresher( $this->store ) )->refresh( 'rt_1' );
+		$this->assertSame( TokenRefresher::ALREADY_ROTATED, ( new TokenRefresher( $this->store ) )->refresh( 'rt_1' ) );
 
 		$this->assertCount( 0, Http_Mock::requests() );
 		$this->assertFalse( $this->store->needs_signin() );
@@ -269,7 +269,7 @@ class Test_Token_Refresher extends Test_Case {
 		$this->assertSame( 'rt_1', $this->store->get_refresh_token() );
 		$this->assertNotSame( $stale, $fresh );
 
-		( new TokenRefresher( $this->store ) )->refresh( 'rt_1' );
+		$this->assertSame( TokenRefresher::ALREADY_ROTATED, ( new TokenRefresher( $this->store ) )->refresh( 'rt_1' ) );
 
 		$this->assertCount( 0, Http_Mock::requests() );
 		$this->assertSame( 'rt_2', $this->store->get_refresh_token() );

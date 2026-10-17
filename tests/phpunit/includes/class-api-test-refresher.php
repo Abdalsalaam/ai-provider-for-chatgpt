@@ -58,11 +58,13 @@ class Api_Test_Refresher extends TokenRefresher {
 	 * {@inheritDoc}
 	 *
 	 * @param string|null $expected_refresh_token Refresh token the caller read.
+	 * @return string Always REFRESHED; the authentication layer ignores it.
 	 */
-	public function refresh( ?string $expected_refresh_token = null ): void {
+	public function refresh( ?string $expected_refresh_token = null ): string {
 		$this->calls[] = $expected_refresh_token;
 		if ( null !== $this->on_refresh ) {
 			call_user_func( $this->on_refresh );
 		}
+		return self::REFRESHED;
 	}
 }
