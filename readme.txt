@@ -55,6 +55,8 @@ Prompts and content you send through the AI Client are sent to OpenAI for proces
 3. The tab then shows an error such as "This site can't be reached" for 127.0.0.1. That is expected: nothing is wrong.
 4. Copy the full address from that tab's address bar, come back to the settings tab, paste it and click **Connect**. **Paste from clipboard** pastes it for you; the address starts with `http://127.0.0.1:1455/auth/callback`.
 
+If no ChatGPT tab opened, click **Open ChatGPT sign-in** under "Didn't see the ChatGPT tab?". It reopens the same sign-in page and keeps the countdown.
+
 Each sign-in attempt is valid for 10 minutes. If it expires, click **Start again**.
 
 = Why does the browser show a page that cannot load? =
