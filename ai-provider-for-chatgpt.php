@@ -207,8 +207,7 @@ add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' 
  * @return void
  */
 function activate(): void {
-	$store = new TokenStore();
-	if ( null !== $store->get() && ! $store->needs_signin() ) {
+	if ( ( new TokenStore() )->is_connected() ) {
 		TokenRefresher::schedule();
 	}
 }

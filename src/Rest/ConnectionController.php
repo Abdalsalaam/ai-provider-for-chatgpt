@@ -94,6 +94,12 @@ class ConnectionController extends WP_REST_Controller {
 					'methods'             => WP_REST_Server::DELETABLE,
 					'callback'            => array( $this, 'disconnect' ),
 					'permission_callback' => array( $this, 'permissions' ),
+					'args'                => array(
+						'forget' => array(
+							'type'    => 'boolean',
+							'default' => false,
+						),
+					),
 				),
 			)
 		);
@@ -240,13 +246,17 @@ class ConnectionController extends WP_REST_Controller {
 	}
 
 	/**
-	 * DELETE /connection: revokes the refresh token and clears the connection.
+	 * DELETE /connection: revokes the refresh token and signs out.
+	 *
+	 * The registration (issued client id and account) is kept for the next
+	 * sign-in unless forget is true, which removes it for a different account.
 	 *
 	 * @since 0.1.0
 	 *
+	 * @param WP_REST_Request $request The request.
 	 * @return WP_REST_Response
 	 */
-	public function disconnect(): WP_REST_Response {
+	public function disconnect( WP_REST_Request $request ): WP_REST_Response {
 		$revoked       = false;
 		$refresh_token = $this->store->get_refresh_token();
 		$client_id     = $this->store->get_client_id();
@@ -254,7 +264,11 @@ class ConnectionController extends WP_REST_Controller {
 			$revoked = $this->endpoint->revoke( $client_id, $refresh_token );
 		}
 
-		$this->store->clear();
+		if ( true === $request->get_param( 'forget' ) ) {
+			$this->store->clear();
+		} else {
+			$this->store->sign_out();
+		}
 		delete_option( SignInFlow::FIRST_NOTICE_OPTION );
 		delete_transient( SignInFlow::pending_key( get_current_user_id() ) );
 		$this->clear_model_cache();
@@ -310,8 +324,7 @@ class ConnectionController extends WP_REST_Controller {
 	 * @return array<string, mixed>
 	 */
 	private function status( bool $show_notice ): array {
-		$record       = $this->store->get();
-		$needs_signin = null !== $record && $this->store->needs_signin();
+		$needs_signin = $this->store->needs_signin();
 		$expires_at   = $this->store->get_expires_at();
 		$last_refresh = $this->store->get_last_refresh_timestamp();
 
@@ -329,7 +342,7 @@ class ConnectionController extends WP_REST_Controller {
 		}
 
 		return array(
-			'connected'                => null !== $record && ! $needs_signin,
+			'connected'                => $this->store->is_connected(),
 			'needs_signin'             => $needs_signin,
 			'email'                    => $this->store->get_email(),
 			'name'                     => $this->store->get_name(),

@@ -428,4 +428,50 @@ class Test_Sign_In_Flow extends Test_Case {
 			$this->assertSame( "ChatGPT did not accept the sign-in: Client isn't allowed & blocked.", $e->getMessage() );
 		}
 	}
+
+	/**
+	 * After a sign-out the start reuses the registration with only the login hint.
+	 */
+	public function test_start_after_sign_out_reuses_registration() {
+		$this->store->save( OAuth_Test_Helpers::record() );
+		$this->store->sign_out();
+
+		$params = $this->query( ( new SignInFlow( $this->store ) )->start( self::USER )['authorize_url'] );
+
+		$this->assertSame( 'oaiapp_x', $params['client_id'] );
+		$this->assertSame( 'ada@example.com', $params['login_hint'] );
+		$this->assertArrayNotHasKey( 'id_token_hint', $params );
+		$this->assertArrayNotHasKey( 'agent_name_hint', $params );
+		$this->assertSame( 'oaiapp_x', get_transient( SignInFlow::pending_key( self::USER ) )['client_id'] );
+	}
+
+	/**
+	 * Signing in again after a sign-out restores a full connection.
+	 */
+	public function test_sign_in_after_sign_out() {
+		$this->store->save( OAuth_Test_Helpers::record() );
+		$this->store->sign_out();
+		( new SignInFlow( $this->store ) )->start( self::USER );
+		$this->queue_exchange();
+
+		( new SignInFlow( $this->store ) )->complete( self::USER, $this->callback_url() );
+
+		$this->assertTrue( $this->store->is_connected() );
+		$this->assertSame( 'at_2', $this->store->get_access_token() );
+		$this->assertSame( 'oaiapp_x', Http_Mock::requests()[0]['body']['client_id'] );
+	}
+
+	/**
+	 * After a sign-out another ChatGPT account is still refused.
+	 */
+	public function test_other_account_after_sign_out_is_refused() {
+		$this->store->save( OAuth_Test_Helpers::record() );
+		$this->store->sign_out();
+		( new SignInFlow( $this->store ) )->start( self::USER );
+		$this->queue_exchange( array( 'sub' => 'user_2' ) );
+
+		$this->assertSame( 'account_mismatch', $this->complete_error( $this->callback_url() ) );
+		$this->assertFalse( $this->store->is_connected() );
+		$this->assertSame( 'user_1', $this->store->get_subject() );
+	}
 }
