@@ -5,6 +5,10 @@
  * @package Halawa\ChatGptAiProvider
  */
 
-defined( 'ABSPATH' ) || exit;
-
-define( 'AI_PROVIDER_CHATGPT_VERSION', '1.0.0' );
+// The WordPress extension defines ABSPATH; the plugin files also guard on these.
+if ( ! defined( 'WPINC' ) ) {
+	define( 'WPINC', 'wp-includes' );
+}
+if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+	define( 'WP_UNINSTALL_PLUGIN', true );
+}

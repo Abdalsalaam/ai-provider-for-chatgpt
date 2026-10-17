@@ -12,21 +12,35 @@ namespace Halawa\ChatGptAiProvider\Authentication;
 use WordPress\AiClient\Common\Exception\RuntimeException;
 use WordPress\AiClient\Providers\Http\Contracts\RequestAuthenticationInterface;
 use WordPress\AiClient\Providers\Http\DTO\Request;
-use Halawa\ChatGptAiProvider\OAuth\IdTokenClaims;
+use Halawa\ChatGptAiProvider\OAuth\OAuthException;
 use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 
-use function Halawa\ChatGptAiProvider\codex_client_version;
+use function Halawa\ChatGptAiProvider\user_agent;
 
 /**
- * Adds the OAuth bearer token and ChatGPT account headers to outgoing requests.
- *
- * Performs a proactive refresh when the stored tokens are older than the Codex
- * CLI refresh window (8 days) and exposes {@see forceRefresh()} so the model
- * layer can retry once on HTTP 401.
+ * Adds the bearer token and user agent to API requests and refreshes when due.
  *
  * @since 0.1.0
  */
 class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
+
+	/**
+	 * Message when the stored record needs a new sign-in.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @var string
+	 */
+	public const SESSION_ENDED = 'ChatGPT session ended. Sign in again under Settings > ChatGPT.';
+
+	/**
+	 * Message when no record is stored.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @var string
+	 */
+	public const NOT_CONNECTED = 'The ChatGPT provider is not connected. Visit Settings > ChatGPT to sign in.';
 
 	/**
 	 * Persistent token storage.
@@ -41,20 +55,6 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 	 * @var TokenRefresher
 	 */
 	private $refresher;
-
-	/**
-	 * Memoized installation id for this request.
-	 *
-	 * @var string|null
-	 */
-	private static $installation_id_cache;
-
-	/**
-	 * Memoized thread id for this request.
-	 *
-	 * @var string|null
-	 */
-	private static $thread_id_cache;
 
 	/**
 	 * Constructor.
@@ -76,81 +76,58 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 	 *
 	 * @param Request $request The outgoing request to authenticate.
 	 * @return Request
-	 * @throws RuntimeException When no valid access token or account ID is available.
+	 * @throws RuntimeException When not connected or the session ended.
+	 * @throws OAuthException When a due refresh fails and the stored token cannot be used.
 	 */
 	public function authenticateRequest( Request $request ): Request {
-		$access_token = $this->store->get_access_token();
-		if ( null === $access_token || '' === $access_token || IdTokenClaims::is_expired( $access_token ) || $this->refresher->is_due() ) {
-			$this->refresher->refresh();
-			$access_token = $this->store->get_access_token();
+		if ( $this->store->needs_signin() ) {
+			throw new RuntimeException( self::SESSION_ENDED ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text constant, escaped where shown.
 		}
-		$account_id = $this->store->get_account_id();
-		if ( null === $access_token || '' === $access_token || null === $account_id || '' === $account_id ) {
-			throw new RuntimeException(
-				'The ChatGPT provider is not connected. Visit Settings → ChatGPT to sign in.'
-			);
+		if ( ! $this->has_token() ) {
+			throw new RuntimeException( self::NOT_CONNECTED ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text constant, escaped where shown.
 		}
-
-		// The Codex backend allowlists known originators; presenting as
-		// codex_cli_rs is what Codex CLI itself sends and ensures the request
-		// is accepted. session-id / thread-id / x-codex-installation-id are
-		// required by /responses (codex-rs/codex-api/src/requests/headers.rs).
-		if ( null === self::$installation_id_cache ) {
-			$installation_id = get_option( 'halawa_chatgpt_installation_id', '' );
-			if ( ! is_string( $installation_id ) || '' === $installation_id ) {
-				$installation_id = wp_generate_uuid4();
-				update_option( 'halawa_chatgpt_installation_id', $installation_id, false );
+		if ( $this->refresher->is_due() ) {
+			try {
+				$this->refresher->refresh( $this->store->get_refresh_token() );
+			} catch ( OAuthException $e ) {
+				if ( ! self::is_transient( $e ) || $this->refresher->is_expired() ) {
+					throw $e;
+				}
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Diagnostic under WP_DEBUG only.
+					error_log( 'ai-provider-for-chatgpt: refresh failed, using the current token: ' . $e->getErrorCode() );
+				}
 			}
-			self::$installation_id_cache = $installation_id;
 		}
-		$installation_id = self::$installation_id_cache;
-
-		// thread-id is the Codex backend's conversation-continuity key, so keep
-		// it stable per installation; session-id rotates per request, which
-		// matches Codex CLI behavior for one-shot completions.
-		if ( null === self::$thread_id_cache ) {
-			$thread_id = get_option( 'halawa_chatgpt_thread_id', '' );
-			if ( ! is_string( $thread_id ) || '' === $thread_id ) {
-				$thread_id = wp_generate_uuid4();
-				update_option( 'halawa_chatgpt_thread_id', $thread_id, false );
-			}
-			self::$thread_id_cache = $thread_id;
+		if ( ! $this->has_token() ) {
+			throw new RuntimeException( self::NOT_CONNECTED ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Plain-text constant, escaped where shown.
 		}
-		$thread_id = self::$thread_id_cache;
-		$authenticated = $request
-			->withHeader( 'Authorization', 'Bearer ' . $access_token )
-			->withHeader( 'ChatGPT-Account-ID', $account_id )
-			->withHeader( 'originator', 'codex_cli_rs' )
-			->withHeader( 'User-Agent', 'codex_cli_rs/' . codex_client_version() . ' (WordPress; ai-provider-for-chatgpt)' )
-			->withHeader( 'session-id', wp_generate_uuid4() )
-			->withHeader( 'thread-id', $thread_id )
-			->withHeader( 'x-codex-installation-id', $installation_id );
-
-		$data = $this->store->get();
-		if ( null !== $data && IdTokenClaims::is_fedramp( $data['tokens']['id_token'] ) ) {
-			$authenticated = $authenticated->withHeader( 'X-OpenAI-Fedramp', 'true' );
-		}
-
-		return $authenticated;
+		return $request
+			->withHeader( 'Authorization', 'Bearer ' . $this->store->get_access_token() )
+			->withHeader( 'User-Agent', user_agent() );
 	}
 
 	/**
-	 * Triggers an immediate token refresh, ignoring the proactive window.
+	 * Refreshes after a 401 unless another process already replaced the token.
 	 *
 	 * @since 0.1.0
 	 *
+	 * @param string $failed_access_token The access token the API rejected.
 	 * @return void
 	 */
-	public function force_refresh(): void {
-		$this->refresher->refresh();
+	public function force_refresh( string $failed_access_token ): void {
+		$current = (string) $this->store->get_access_token();
+		if ( '' !== $current && ! hash_equals( $current, $failed_access_token ) ) {
+			return;
+		}
+		$this->refresher->refresh( $this->store->get_refresh_token() );
 	}
 
 	/**
 	 * {@inheritDoc}
 	 *
-	 * Tokens are stored out-of-band in the encrypted `TokenStore`, not via the
-	 * SDK's credential schema, so this returns an empty object schema purely
-	 * to satisfy the interface contract.
+	 * Tokens live in the encrypted TokenStore, not in the SDK's credential
+	 * schema, so this returns an empty object schema for the interface.
 	 *
 	 * @since 0.1.0
 	 *
@@ -162,5 +139,26 @@ class ChatGptAccountAuthentication implements RequestAuthenticationInterface {
 			'properties'           => new \stdClass(),
 			'additionalProperties' => false,
 		);
+	}
+
+	/**
+	 * Whether the store holds a non-empty access token.
+	 *
+	 * @return bool
+	 */
+	private function has_token(): bool {
+		$token = $this->store->get_access_token();
+		return null !== $token && '' !== $token;
+	}
+
+	/**
+	 * Whether a refresh error is a network, server or lock-wait failure.
+	 *
+	 * @param OAuthException $e The refresh error.
+	 * @return bool
+	 */
+	private static function is_transient( OAuthException $e ): bool {
+		$code = $e->getErrorCode();
+		return 'network_error' === $code || 'refresh_in_progress' === $code || $e->getHttpStatus() >= 500;
 	}
 }

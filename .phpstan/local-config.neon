@@ -1,6 +1,10 @@
 # local PHPStan configuration for AI Provider for ChatGPT
 includes:
     - ./dist/phpstan.neon
+    - ../vendor/szepeviktor/phpstan-wordpress/extension.neon
 parameters:
-    bootstrapFiles:
-        - phpstan-bootstrap.php
+    level: 2
+    paths:
+        - ../src
+        - ../ai-provider-for-chatgpt.php
+        - ../uninstall.php
