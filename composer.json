@@ -75,6 +75,7 @@
             ".phpcs.*.xml",
             ".phpcs.xml",
             "README.md",
+            "MANUAL_STEPS.md",
             "package.json",
             "package-lock.json",
             "composer.lock",
