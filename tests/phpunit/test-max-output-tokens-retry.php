@@ -10,7 +10,11 @@ use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Messages\DTO\UserMessage;
 use WordPress\AiClient\Providers\Models\DTO\ModelConfig;
 
+use const Halawa\ChatGptAiProvider\API_BASE_URL;
+use const Halawa\ChatGptAiProvider\TOKEN_ENDPOINT;
+
 require_once __DIR__ . '/includes/class-api-test-helpers.php';
+require_once __DIR__ . '/includes/class-oauth-test-helpers.php';
 
 /**
  * The route lists max_output_tokens as unsupported; a rejection of it retries once without it.
@@ -160,5 +164,30 @@ class Test_Max_Output_Tokens_Retry extends Test_Case {
 		$this->assertSame( 'Bearer access-2', Api_Test_Helpers::request_headers( $requests[2] )['authorization'] );
 		$this->assertArrayHasKey( 'max_output_tokens', Api_Test_Helpers::request_json( $requests[1] ) );
 		$this->assertArrayNotHasKey( 'max_output_tokens', Api_Test_Helpers::request_json( $requests[2] ) );
+	}
+
+	/**
+	 * A 401 after the max_output_tokens retry still refreshes and retries.
+	 */
+	public function test_max_output_tokens_retry_keeps_the_401_retry() {
+		$store = Api_Test_Helpers::connected_store();
+		Http_Mock::queue( Api_Test_Helpers::response( 400, self::unsupported( 'max_output_tokens' ) ) );
+		Http_Mock::queue( Http_Mock::json( array( 'detail' => 'Unauthorized' ), 401 ) );
+		Http_Mock::queue( Http_Mock::json( OAuth_Test_Helpers::token_response() ) );
+		Http_Mock::queue( Http_Mock::sse( self::fixture( 'stream-plain.sse' ) ) );
+		$config = new ModelConfig();
+		$config->setMaxTokens( 64 );
+
+		Api_Test_Helpers::model( $config, new ChatGptAccountAuthentication( $store ) )
+			->generateTextResult( array( new UserMessage( array( new MessagePart( 'Hi' ) ) ) ) );
+
+		$requests = Http_Mock::requests();
+		$this->assertSame(
+			array( API_BASE_URL . '/responses', API_BASE_URL . '/responses', TOKEN_ENDPOINT, API_BASE_URL . '/responses' ),
+			array_column( $requests, 'url' )
+		);
+		$this->assertSame( 'Bearer at_2', Api_Test_Helpers::request_headers( $requests[3] )['authorization'] );
+		$this->assertArrayNotHasKey( 'max_output_tokens', Api_Test_Helpers::request_json( $requests[1] ) );
+		$this->assertArrayNotHasKey( 'max_output_tokens', Api_Test_Helpers::request_json( $requests[3] ) );
 	}
 }

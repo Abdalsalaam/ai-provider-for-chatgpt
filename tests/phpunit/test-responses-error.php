@@ -172,6 +172,19 @@ class Test_Responses_Error extends Test_Case {
 		$this->assertTrue( ResponsesError::rejects_param( '{"detail":"Unsupported parameter: max_output_tokens"}', 'max_output_tokens' ) );
 		$this->assertFalse( ResponsesError::rejects_param( (string) $other, 'max_output_tokens' ) );
 		$this->assertFalse( ResponsesError::rejects_param( (string) $other_code, 'max_output_tokens' ) );
+		foreach ( array( 'unsupported_parameter', 'unknown_parameter' ) as $code ) {
+			$standard = wp_json_encode(
+				array(
+					'error' => array(
+						'type'    => 'invalid_request_error',
+						'code'    => $code,
+						'param'   => 'max_output_tokens',
+						'message' => "Unsupported parameter: 'max_output_tokens'.",
+					),
+				)
+			);
+			$this->assertTrue( ResponsesError::rejects_param( (string) $standard, 'max_output_tokens' ), $code );
+		}
 		$this->assertFalse( ResponsesError::rejects_param( '{"detail":"System messages are not allowed"}', 'max_output_tokens' ) );
 		$this->assertFalse( ResponsesError::rejects_param( '<html>max_output_tokens</html>', 'max_output_tokens' ) );
 	}
