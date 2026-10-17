@@ -18,7 +18,7 @@ use Psr\SimpleCache\CacheInterface;
  *
  * The PHP AI Client SDK caches the `/models` response through `AiClient::setCache()`,
  * but defaults to a per-request in-memory array when no PSR-16 cache is wired in —
- * so without this adapter the Codex `/models` endpoint is hit on every request that
+ * so without this adapter the `/models` endpoint is hit on every request that
  * touches the provider (admin dashboard checks, AI picker renders, etc.).
  *
  * Keys are sanitized to WordPress's transient name constraints (≤ 172 chars,

@@ -88,5 +88,9 @@ class Test_Config extends Test_Case {
 		$this->assertSame( 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct', \Halawa\ChatGptAiProvider\SCOPES );
 		$this->assertFalse( function_exists( 'Halawa\\ChatGptAiProvider\\oauth_client_id' ) );
 		$this->assertFalse( defined( 'Halawa\\ChatGptAiProvider\\DEFAULT_OAUTH_CLIENT_ID' ) );
+		$this->assertFalse( function_exists( 'Halawa\\ChatGptAiProvider\\codex_client_version' ) );
+		$this->assertFalse( defined( 'Halawa\\ChatGptAiProvider\\DEFAULT_CODEX_CLIENT_VERSION' ) );
+		$this->assertFalse( method_exists( \Halawa\ChatGptAiProvider\Authentication\TokenStore::class, 'get_account_id' ) );
+		$this->assertFalse( class_exists( 'Halawa\\ChatGptAiProvider\\OAuth\\IdTokenClaims' ) );
 	}
 }

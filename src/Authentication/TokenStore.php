@@ -69,7 +69,7 @@ class TokenStore {
 	 *
 	 * @since 0.2.0
 	 *
-	 * @return bool True for a Codex-era or unreadable record.
+	 * @return bool True for a 0.1.x record or an unreadable one.
 	 */
 	public function has_legacy_record(): bool {
 		$raw = get_option( self::OPTION_NAME, '' );
@@ -294,17 +294,6 @@ class TokenStore {
 		$value = $this->get()['last_refresh'] ?? null;
 		$ts    = is_string( $value ) ? strtotime( $value ) : false;
 		return false === $ts ? 0 : $ts;
-	}
-
-	/**
-	 * Codex-era accessor kept until the API client stops calling it.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return string|null Always null for a version 2 record.
-	 */
-	public function get_account_id(): ?string {
-		return null;
 	}
 
 	/**

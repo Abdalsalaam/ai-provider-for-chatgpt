@@ -64,7 +64,6 @@ class Test_Token_Store extends Test_Case {
 		$this->assertFalse( $store->needs_signin() );
 		$this->assertTrue( $store->has_plan_scope() );
 		$this->assertEqualsWithDelta( time(), $store->get_last_refresh_timestamp(), 5 );
-		$this->assertNull( $store->get_account_id() );
 	}
 
 	/**

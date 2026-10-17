@@ -126,43 +126,6 @@ function user_agent(): string {
 }
 
 /**
- * Codex CLI client version reported on every Codex backend request.
- *
- * The backend gates which model set, capabilities, and tool types a client
- * is allowed to see by inspecting this value (both as the `client_version`
- * query string on `/models` and as the User-Agent prefix on `/responses`).
- * Bumping it surfaces newer models (e.g. gpt-5.5) that older client versions
- * are not entitled to. Override via the
- * `halawa_chatgpt_codex_client_version` filter.
- *
- * @since 0.1.0
- */
-const DEFAULT_CODEX_CLIENT_VERSION = '0.133.0';
-
-/**
- * Returns the Codex CLI client version the plugin should impersonate.
- *
- * @since 0.1.0
- *
- * @return string The client version (e.g. "0.65.0").
- */
-function codex_client_version(): string {
-	/**
-	 * Filters the Codex CLI client version the plugin impersonates.
-	 *
-	 * The Codex backend gates the visible model set, capability flags, and
-	 * tool types behind this value. Override it on a site to opt into newer
-	 * models without waiting for a plugin release.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string $version Default client version (e.g. "0.65.0").
-	 */
-	$value = apply_filters( 'halawa_chatgpt_codex_client_version', DEFAULT_CODEX_CLIENT_VERSION );
-	return is_string( $value ) && '' !== $value ? $value : DEFAULT_CODEX_CLIENT_VERSION;
-}
-
-/**
  * Registers the ChatGPT provider with the WordPress AI Client.
  *
  * Registration happens unconditionally so the connector is discoverable in
@@ -181,7 +144,7 @@ function register_provider(): void {
 
 	// Wire a transient-backed PSR-16 cache so the SDK's `/models` lookup is
 	// persisted across requests. Without this the SDK falls back to a
-	// per-request in-memory array, which means the Codex /models endpoint
+	// per-request in-memory array, which means the /models endpoint
 	// is hit on every admin page load. Idempotent if called more than once.
 	if ( null === AiClient::getCache() ) {
 		AiClient::setCache( new TransientCache() );
