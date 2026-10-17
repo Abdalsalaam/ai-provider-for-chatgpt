@@ -440,11 +440,11 @@ class ConnectionController extends WP_REST_Controller {
 		$id_expired = false;
 
 		if ( null !== $data ) {
-			$id_token   = $data['tokens']['id_token'];
-			$connected  = '' !== ( $data['tokens']['access_token'] ?? '' );
+			$id_token   = (string) ( $data['id_token'] ?? '' );
+			$connected  = '' !== ( $data['access_token'] ?? '' );
 			$email      = IdTokenClaims::email( $id_token );
 			$plan       = IdTokenClaims::plan_type( $id_token );
-			$account_id = $data['tokens']['account_id'];
+			$account_id = null;
 			$is_fedramp = IdTokenClaims::is_fedramp( $id_token );
 			$id_expired = IdTokenClaims::is_expired( $id_token );
 		}
