@@ -19,6 +19,7 @@ type Props = {
 export function ConnectScreen( { status, onConnected }: Props ) {
 	const signIn = useSignIn( onConnected );
 	const [ callbackUrl, setCallbackUrl ] = useState( '' );
+	const [ clipboardFailed, setClipboardFailed ] = useState( false );
 
 	const restart = () => {
 		setCallbackUrl( '' );
@@ -31,6 +32,36 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 			: signIn.error?.message;
 
 	const blocked = signIn.expired || signIn.needsRestart;
+	const inStep2 = signIn.start !== null;
+	const exampleAddress = `${ status.redirect_uri }?code=...&state=...`;
+
+	const pasteFromClipboard = async () => {
+		setClipboardFailed( false );
+		try {
+			setCallbackUrl( ( await navigator.clipboard.readText() ).trim() );
+		} catch {
+			setClipboardFailed( true );
+		}
+	};
+
+	const steps = [
+		__(
+			'Click Continue with ChatGPT. A ChatGPT sign-in page opens in a new tab.',
+			'ai-provider-for-chatgpt'
+		),
+		__(
+			'Sign in, keep the agent name, and approve Use your ChatGPT plan.',
+			'ai-provider-for-chatgpt'
+		),
+		__(
+			'The tab then shows an error such as "This site can\'t be reached" for 127.0.0.1. That is expected: nothing is wrong.',
+			'ai-provider-for-chatgpt'
+		),
+		__(
+			"Copy the full address from that tab's address bar, come back to this tab, paste it below and click Connect.",
+			'ai-provider-for-chatgpt'
+		),
+	];
 
 	return (
 		<div className="ai-provider-for-chatgpt-connect">
@@ -81,6 +112,42 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 				</Notice.Root>
 			) }
 
+			<h3 className="ai-provider-for-chatgpt-steps-title">
+				{ __( 'How connecting works', 'ai-provider-for-chatgpt' ) }
+			</h3>
+			<ol className="ai-provider-for-chatgpt-steps">
+				{ steps.map( ( text, index ) => {
+					// After Continue, the admin's next move is steps 3 and 4.
+					const current = inStep2 && index >= 2;
+					return (
+						<li
+							key={ index }
+							className={ current ? 'is-current' : undefined }
+							aria-current={
+								current && index === 2 ? 'step' : undefined
+							}
+						>
+							{ text }
+						</li>
+					);
+				} ) }
+			</ol>
+			<figure className="ai-provider-for-chatgpt-addressbar">
+				<div className="ai-provider-for-chatgpt-addressbar-bar">
+					<span
+						className="ai-provider-for-chatgpt-addressbar-dots"
+						aria-hidden="true"
+					/>
+					<code>{ exampleAddress }</code>
+				</div>
+				<figcaption>
+					{ __(
+						'Copy this whole address',
+						'ai-provider-for-chatgpt'
+					) }
+				</figcaption>
+			</figure>
+
 			{ ! signIn.start && (
 				<p className="ai-provider-for-chatgpt-actions-row">
 					<Button
@@ -103,22 +170,28 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 			{ signIn.start && (
 				<div className="ai-provider-for-chatgpt-step">
 					<p>
+						<strong>
+							{ __(
+								'Waiting for you in the other tab. When it shows the error page, copy its address and paste it here.',
+								'ai-provider-for-chatgpt'
+							) }
+						</strong>
+					</p>
+					<p>
 						{ __(
-							'A ChatGPT sign-in page opened in a new tab. If it did not open, use this link:',
+							'If no new tab opened, use this link:',
 							'ai-provider-for-chatgpt'
 						) }{ ' ' }
-						<Link href={ signIn.start.authorize_url } openInNewTab>
+						<Link
+							href={ signIn.start.authorize_url }
+							openInNewTab
+							rel="noopener noreferrer"
+						>
 							{ __(
 								'Open the ChatGPT sign-in page',
 								'ai-provider-for-chatgpt'
 							) }
 						</Link>
-					</p>
-					<p>
-						{ __(
-							'After you approve, the browser opens a page at 127.0.0.1 that cannot load. That is expected. Copy the full address from the address bar and paste it here.',
-							'ai-provider-for-chatgpt'
-						) }
 					</p>
 					<TextControl
 						__next40pxDefaultSize
@@ -130,6 +203,21 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 						value={ callbackUrl }
 						onChange={ setCallbackUrl }
 						placeholder={ `${ signIn.start.redirect_uri }?code=...` }
+						help={
+							clipboardFailed
+								? __(
+										'Could not read the clipboard. Paste the address with Ctrl+V or Cmd+V.',
+										'ai-provider-for-chatgpt'
+								  )
+								: sprintf(
+										/* translators: %s: the callback address the pasted address must start with. */
+										__(
+											'It starts with %s',
+											'ai-provider-for-chatgpt'
+										),
+										signIn.start.redirect_uri
+								  )
+						}
 						autoComplete="off"
 						spellCheck={ false }
 						disabled={ blocked || signIn.submitting }
@@ -144,6 +232,19 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 						>
 							{ __( 'Connect', 'ai-provider-for-chatgpt' ) }
 						</Button>
+						{ typeof navigator.clipboard?.readText ===
+							'function' && (
+							<Button
+								variant="outline"
+								disabled={ blocked || signIn.submitting }
+								onClick={ () => void pasteFromClipboard() }
+							>
+								{ __(
+									'Paste from clipboard',
+									'ai-provider-for-chatgpt'
+								) }
+							</Button>
+						) }
 						<Button
 							variant={ blocked ? 'solid' : 'minimal' }
 							tone={ blocked ? 'brand' : 'neutral' }
