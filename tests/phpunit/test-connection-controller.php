@@ -271,6 +271,27 @@ class Test_Connection_Controller extends Test_Case {
 	}
 
 	/**
+	 * A refresh that returns the same refresh token still answers 200.
+	 */
+	public function test_refresh_route_with_unrotated_refresh_token() {
+		( new TokenStore() )->save( OAuth_Test_Helpers::record() );
+		Http_Mock::queue( Http_Mock::json( OAuth_Test_Helpers::token_response( array( 'refresh_token' => 'rt_1' ) ) ) );
+
+		$response = $this->dispatch( 'POST', '/connection/refresh' );
+
+		$this->assertSame( 200, $response->get_status() );
+		$token_calls = array_filter(
+			array_column( Http_Mock::requests(), 'url' ),
+			static function ( $url ) {
+				return 'https://auth.openai.com/api/accounts/oauth/token' === $url;
+			}
+		);
+		$this->assertCount( 1, $token_calls );
+		$this->assertSame( 'at_2', ( new TokenStore() )->get_access_token() );
+		$this->assertSame( 'rt_1', ( new TokenStore() )->get_refresh_token() );
+	}
+
+	/**
 	 * Disconnect revokes, then clears everything the connection created.
 	 */
 	public function test_disconnect_revokes_then_clears() {
