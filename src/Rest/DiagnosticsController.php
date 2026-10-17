@@ -15,10 +15,13 @@ use WP_REST_Controller;
 use WP_REST_Response;
 use WP_REST_Server;
 use WordPress\AiClient\AiClient;
+use WordPress\AiClient\Providers\Http\DTO\Request;
+use WordPress\AiClient\Providers\Http\Enums\HttpMethodEnum;
+use Halawa\ChatGptAiProvider\Authentication\ChatGptAccountAuthentication;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
+use Halawa\ChatGptAiProvider\Metadata\ChatGptModelMetadataDirectory;
+use Halawa\ChatGptAiProvider\Models\ResponsesError;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
-
-use function Halawa\ChatGptAiProvider\codex_client_version;
 
 /**
  * REST controller for the React diagnostics panel.
@@ -153,134 +156,69 @@ class DiagnosticsController extends WP_REST_Controller {
 	}
 
 	/**
-	 * GET /diagnostics/remote-models — slow direct probe of the Codex backend.
+	 * GET /diagnostics/remote-models: direct probe of GET /v1/models.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @return WP_REST_Response
 	 */
 	public function remote_models(): WP_REST_Response {
-		$access_token = (string) $this->store->get_access_token();
-		$account_id   = (string) $this->store->get_account_id();
+		$result = array(
+			'http_status'   => 0,
+			'model_ids'     => array(),
+			'text_only_ids' => array(),
+			'raw_models'    => array(),
+			'error'         => null,
+		);
 
-		if ( '' === $access_token || '' === $account_id ) {
-			return new WP_REST_Response(
-				array(
-					'http_status' => 0,
-					'model_ids'   => array(),
-					'raw_keys'    => array(),
-					'error'       => __( 'Not connected — import an auth bundle first.', 'ai-provider-for-chatgpt' ),
-				),
-				200
+		try {
+			$request = ( new ChatGptAccountAuthentication( $this->store ) )->authenticateRequest(
+				new Request( HttpMethodEnum::GET(), ChatGptProvider::url( 'models' ) )
 			);
+		} catch ( Throwable $e ) {
+			$result['error'] = $e->getMessage();
+			return new WP_REST_Response( $result, 200 );
 		}
 
-		$client_version = codex_client_version();
-		$response       = wp_remote_get(
-			'https://chatgpt.com/backend-api/codex/models?client_version=' . rawurlencode( $client_version ),
+		$response = wp_safe_remote_get(
+			$request->getUri(),
 			array(
-				'headers' => array(
-					'Authorization'      => 'Bearer ' . $access_token,
-					'ChatGPT-Account-ID' => $account_id,
-					'originator'         => 'codex_cli_rs',
-					'User-Agent'         => 'codex_cli_rs/' . $client_version . ' (WordPress; ai-provider-for-chatgpt)',
-				),
+				'headers' => ResponsesError::lower_headers( $request->getHeaders() ),
 				'timeout' => 15,
 			)
 		);
-
 		if ( is_wp_error( $response ) ) {
-			return new WP_REST_Response(
-				array(
-					'http_status' => 0,
-					'model_ids'   => array(),
-					'raw_keys'    => array(),
-					'error'       => $response->get_error_message(),
-				),
-				200
+			$result['error'] = $response->get_error_message();
+			return new WP_REST_Response( $result, 200 );
+		}
+
+		$status                = (int) wp_remote_retrieve_response_code( $response );
+		$body                  = (string) wp_remote_retrieve_body( $response );
+		$result['http_status'] = $status;
+		if ( $status < 200 || $status >= 300 ) {
+			$request_id      = (string) wp_remote_retrieve_header( $response, 'x-oai-request-id' );
+			$result['error'] = ResponsesError::message( $status, $body, '' !== $request_id ? array( 'x-oai-request-id' => $request_id ) : array() );
+			return new WP_REST_Response( $result, 200 );
+		}
+
+		$decoded = json_decode( $body, true );
+		if ( ! is_array( $decoded ) ) {
+			$result['error'] = 'Response was not valid JSON.';
+			return new WP_REST_Response( $result, 200 );
+		}
+		foreach ( ChatGptModelMetadataDirectory::normalise_entries( $decoded ) as $entry ) {
+			$result['model_ids'][] = $entry['id'];
+			if ( $entry['listed'] ) {
+				$result['text_only_ids'][] = $entry['id'];
+			}
+			$result['raw_models'][] = array(
+				'id'                        => $entry['id'],
+				'slug'                      => $entry['id'],
+				'name'                      => $entry['name'],
+				'model_family_display_name' => null,
+				'passes_text_filter'        => $entry['listed'],
 			);
 		}
-
-		$status         = (int) wp_remote_retrieve_response_code( $response );
-		$body           = (string) wp_remote_retrieve_body( $response );
-		$decoded        = json_decode( $body, true );
-		$model_ids      = array();
-		$text_only_ids  = array();
-		$raw_models     = array();
-		$raw_keys       = array();
-		$error          = null;
-
-		if ( ! is_array( $decoded ) ) {
-			$error = 'Response was not valid JSON: ' . substr( $body, 0, 200 );
-		} else {
-			$raw_keys = array_keys( $decoded );
-			$entries  = array();
-			if ( isset( $decoded['models'] ) && is_array( $decoded['models'] ) ) {
-				$entries = $decoded['models'];
-			} elseif ( isset( $decoded['data'] ) && is_array( $decoded['data'] ) ) {
-				$entries = $decoded['data'];
-			}
-
-			foreach ( $entries as $entry ) {
-				if ( ! is_array( $entry ) ) {
-					continue;
-				}
-				// Match the directory's id resolution: id → slug → name.
-				$id = $entry['id'] ?? ( $entry['slug'] ?? ( $entry['name'] ?? null ) );
-				if ( ! is_string( $id ) || '' === $id ) {
-					continue;
-				}
-				$model_ids[]  = $id;
-				$raw_models[] = array(
-					'id'                        => $id,
-					'slug'                      => is_string( $entry['slug'] ?? null ) ? $entry['slug'] : null,
-					'name'                      => is_string( $entry['name'] ?? null ) ? $entry['name'] : null,
-					'model_family_display_name' => is_string( $entry['model_family_display_name'] ?? null )
-						? $entry['model_family_display_name']
-						: null,
-					'passes_text_filter'        => self::passes_text_filter( $id ),
-				);
-				if ( self::passes_text_filter( $id ) ) {
-					$text_only_ids[] = $id;
-				}
-			}
-		}
-
-		return new WP_REST_Response(
-			array(
-				'http_status'   => $status,
-				'model_ids'     => $model_ids,
-				'text_only_ids' => $text_only_ids,
-				'raw_keys'      => $raw_keys,
-				'raw_models'    => $raw_models,
-				'error'         => $error,
-			),
-			200
-		);
-	}
-
-	/**
-	 * Mirrors ChatGptModelMetadataDirectory::isTextModel so the diagnostics
-	 * panel can show which entries the SDK would expose.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string $model_id The model id.
-	 * @return bool True if the model passes the text-generation filter.
-	 */
-	private static function passes_text_filter( string $model_id ): bool {
-		$is_candidate = str_starts_with( $model_id, 'gpt-' )
-			|| str_starts_with( $model_id, 'o1' )
-			|| str_starts_with( $model_id, 'o3' )
-			|| str_starts_with( $model_id, 'o4' )
-			|| 'codex-mini-latest' === $model_id;
-		if ( ! $is_candidate ) {
-			return false;
-		}
-		return ! str_contains( $model_id, '-instruct' )
-			&& ! str_contains( $model_id, '-realtime' )
-			&& ! str_contains( $model_id, '-transcribe' )
-			&& ! str_contains( $model_id, '-audio' )
-			&& ! str_contains( $model_id, '-tts' );
+		return new WP_REST_Response( $result, 200 );
 	}
 }
