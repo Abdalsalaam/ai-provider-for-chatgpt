@@ -23,12 +23,13 @@ use WordPress\AiClient\Providers\Models\DTO\ModelMetadata;
 use Halawa\ChatGptAiProvider\Metadata\ChatGptModelMetadataDirectory;
 use Halawa\ChatGptAiProvider\Models\ChatGptTextGenerationModel;
 
+use const Halawa\ChatGptAiProvider\API_BASE_URL;
+
 /**
- * Provider class for OpenAI accessed via the user's ChatGPT account.
+ * Provider class for OpenAI used through the connected ChatGPT account.
  *
- * Requests target the Codex backend (`chatgpt.com/backend-api/codex`) rather
- * than `api.openai.com/v1`, and are authenticated with an OAuth access token
- * obtained through the "Sign in with ChatGPT" flow instead of an API key.
+ * Requests go to the public Responses API with the access token issued by
+ * Sign in with ChatGPT instead of an API key.
  *
  * @since 0.1.0
  */
@@ -40,7 +41,7 @@ class ChatGptProvider extends AbstractApiProvider {
 	 * @since 0.1.0
 	 */
 	protected static function baseUrl(): string {
-		return 'https://chatgpt.com/backend-api/codex';
+		return API_BASE_URL;
 	}
 
 	/**
