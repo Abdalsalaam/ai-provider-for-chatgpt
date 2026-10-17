@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace Halawa\ChatGptAiProvider\Admin;
 
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
-use Halawa\ChatGptAiProvider\Cache\TransientCache;
+use Halawa\ChatGptAiProvider\Cache\ModelCache;
 use const Halawa\ChatGptAiProvider\VERSION;
 
 /**
@@ -84,7 +84,7 @@ final class Upgrade {
 		// Records from 0.1.x and unreadable ones cannot be used, so the admin signs in again.
 		if ( $this->store->has_legacy_record() ) {
 			$this->store->clear();
-			( new TransientCache() )->clear();
+			ModelCache::clear();
 			update_option( self::NOTICE_OPTION, 1, false );
 		}
 		delete_option( 'halawa_chatgpt_thread_id' );

@@ -130,21 +130,7 @@ final class TransientCache implements CacheInterface {
 	 * @return bool
 	 */
 	public function clear(): bool {
-		global $wpdb;
-		// PSR-16 clear() must wipe every cache entry we own. WP has no public
-		// API for prefix-matched transient deletion, so a direct prepared LIKE
-		// on wp_options is the established pattern.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Prefix-matched bulk delete; no caching equivalent.
-		$wpdb->query(
-			$wpdb->prepare(
-				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
-				$wpdb->esc_like( '_transient_ai_client_' ) . '%',
-				$wpdb->esc_like( '_transient_timeout_ai_client_' ) . '%'
-			)
-		);
-		if ( wp_using_ext_object_cache() ) {
-			wp_cache_flush_group( 'transient' );
-		}
+		ModelCache::clear();
 		return true;
 	}
 
