@@ -12,7 +12,7 @@ namespace Halawa\ChatGptAiProvider\OAuth;
 use WordPress\AiClient\Common\Exception\RuntimeException;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 
-use function Halawa\ChatGptAiProvider\oauth_client_id;
+use function Halawa\ChatGptAiProvider\configured_client_id;
 
 /**
  * Exchanges the stored refresh token for a fresh access/refresh/id token set.
@@ -75,7 +75,7 @@ class TokenRefresher {
 		if ( null === $refresh_token ) {
 			throw new RuntimeException( 'Cannot refresh: no refresh token stored.' );
 		}
-		$client_id = oauth_client_id();
+		$client_id = configured_client_id() ?? '';
 
 		$response = wp_remote_post(
 			self::TOKEN_ENDPOINT,

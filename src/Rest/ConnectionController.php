@@ -22,8 +22,6 @@ use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\OAuth\IdTokenClaims;
 use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 
-use function Halawa\ChatGptAiProvider\oauth_client_id;
-
 /**
  * REST controller backing the React Settings → ChatGPT screen.
  *
@@ -474,7 +472,6 @@ class ConnectionController extends WP_REST_Controller {
 			'last_refresh'     => 0 !== $this->store->get_last_refresh_timestamp()
 				? $this->store->get_last_refresh_timestamp()
 				: null,
-			'oauth_client_id'  => oauth_client_id(),
 			'provider'         => array(
 				'registered' => $has_registered,
 				'configured' => $is_configured,

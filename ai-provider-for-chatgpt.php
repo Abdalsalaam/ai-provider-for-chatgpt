@@ -37,15 +37,92 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/vendor/autoload.php';
 
 /**
- * Default OAuth client_id used for the refresh_token grant.
+ * Plugin version, also used in the User-Agent header.
  *
- * This is the Codex CLI public client — the only client OpenAI's OAuth
- * allowlist accepts for ChatGPT-account refresh exchanges. It ships openly
- * in the Codex CLI source, so embedding it here is fine.
- *
- * @since 0.1.0
+ * @since 0.2.0
  */
-const DEFAULT_OAUTH_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const VERSION = '0.2.0';
+
+/**
+ * Sign in with ChatGPT endpoints and identifiers (OpenAI open-source app flow).
+ *
+ * @since 0.2.0
+ */
+const AUTHORIZE_ENDPOINT   = 'https://auth.openai.com/api/accounts/authorize';
+const TOKEN_ENDPOINT       = 'https://auth.openai.com/api/accounts/oauth/token';
+const REVOKE_ENDPOINT      = 'https://auth.openai.com/api/accounts/oauth/revoke';
+const JWKS_URI             = 'https://auth.openai.com/.well-known/jwks.json';
+const ISSUER               = 'https://auth.openai.com';
+const RESOURCE             = 'https://api.openai.com/v1';
+const API_BASE_URL         = 'https://api.openai.com/v1';
+const SCOPES               = 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct';
+const PLAN_SCOPE           = 'chatgpt.tokens.use.direct';
+const AGENT_NAME           = 'AI Provider for ChatGPT';
+const DYNAMIC_CLIENT_ID    = 'dynamic_agent_client';
+const DEFAULT_REDIRECT_URI = 'http://127.0.0.1:1455/auth/callback';
+const USAGE_URL            = 'https://chatgpt.com/settings/usage';
+
+/**
+ * Returns the redirect URI sent on authorize and code exchange.
+ *
+ * @since 0.2.0
+ *
+ * @return string The redirect URI.
+ */
+function redirect_uri(): string {
+	/**
+	 * Filters the OAuth redirect URI, for a registered https client.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param string $uri Default loopback redirect URI.
+	 */
+	$value = apply_filters( 'halawa_chatgpt_redirect_uri', DEFAULT_REDIRECT_URI );
+	return is_string( $value ) && '' !== $value ? $value : DEFAULT_REDIRECT_URI;
+}
+
+/**
+ * Returns the client id from the CHATGPT_OAUTH_CLIENT_ID constant, if set.
+ *
+ * @since 0.2.0
+ *
+ * @return string|null The configured client id, or null.
+ */
+function configured_client_id(): ?string {
+	if ( ! defined( 'CHATGPT_OAUTH_CLIENT_ID' ) ) {
+		return null;
+	}
+	$value = constant( 'CHATGPT_OAUTH_CLIENT_ID' );
+	return is_string( $value ) && '' !== $value ? $value : null;
+}
+
+/**
+ * Returns the stable ext_agent_host_id for this site.
+ *
+ * @since 0.2.0
+ *
+ * @return string The host id, "urn:uuid:" plus the installation uuid.
+ */
+function host_id(): string {
+	$id = get_option( 'halawa_chatgpt_installation_id', '' );
+	if ( ! is_string( $id ) || '' === $id ) {
+		// add_option() keeps an id another request wrote first.
+		add_option( 'halawa_chatgpt_installation_id', wp_generate_uuid4(), '', false );
+		$id = (string) get_option( 'halawa_chatgpt_installation_id', '' );
+	}
+	return 'urn:uuid:' . $id;
+}
+
+/**
+ * Returns the User-Agent sent to OpenAI.
+ *
+ * @since 0.2.0
+ *
+ * @return string The User-Agent header value.
+ */
+function user_agent(): string {
+	return 'ai-provider-for-chatgpt/' . VERSION . ' (WordPress/' . get_bloginfo( 'version' ) . ')';
+}
 
 /**
  * Codex CLI client version reported on every Codex backend request.
@@ -82,27 +159,6 @@ function codex_client_version(): string {
 	 */
 	$value = apply_filters( 'halawa_chatgpt_codex_client_version', DEFAULT_CODEX_CLIENT_VERSION );
 	return is_string( $value ) && '' !== $value ? $value : DEFAULT_CODEX_CLIENT_VERSION;
-}
-
-/**
- * Returns the OAuth client_id used for the refresh_token grant.
- *
- * Defaults to the Codex CLI public client; sites that want to refresh
- * against a different OAuth client can override by defining the
- * `CHATGPT_OAUTH_CLIENT_ID` constant in wp-config.php.
- *
- * @since 0.1.0
- *
- * @return string The OAuth client_id.
- */
-function oauth_client_id(): string {
-	if ( defined( 'CHATGPT_OAUTH_CLIENT_ID' ) ) {
-		$value = constant( 'CHATGPT_OAUTH_CLIENT_ID' );
-		if ( is_string( $value ) && '' !== $value ) {
-			return $value;
-		}
-	}
-	return DEFAULT_OAUTH_CLIENT_ID;
 }
 
 /**
