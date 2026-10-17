@@ -227,10 +227,7 @@ export function ConnectScreen( { onImported }: Props ) {
 						onClick={ () => setShowAdvanced( ( v ) => ! v ) }
 					>
 						{ showAdvanced
-							? __(
-									'Hide advanced',
-									'ai-provider-for-chatgpt'
-							  )
+							? __( 'Hide advanced', 'ai-provider-for-chatgpt' )
 							: __(
 									'Have a Codex auth.json already? Use advanced',
 									'ai-provider-for-chatgpt'
@@ -256,10 +253,7 @@ export function ConnectScreen( { onImported }: Props ) {
 							onClick={ () => copyCommand( command ) }
 						>
 							{ copied
-								? __(
-										'Copied!',
-										'ai-provider-for-chatgpt'
-								  )
+								? __( 'Copied!', 'ai-provider-for-chatgpt' )
 								: __(
 										'Copy command',
 										'ai-provider-for-chatgpt'
@@ -333,24 +327,18 @@ export function ConnectScreen( { onImported }: Props ) {
 							disabled={ submitting }
 							onClick={ () => submit( bundle ) }
 						>
-							{ __(
-								'Import bundle',
-								'ai-provider-for-chatgpt'
-							) }
+							{ __( 'Import bundle', 'ai-provider-for-chatgpt' ) }
 						</Button>
 						<FormFileUpload
 							accept="application/json,.json"
 							onChange={ ( event ) => {
-								const file =
-									event.currentTarget.files?.[ 0 ];
+								const file = event.currentTarget.files?.[ 0 ];
 								if ( ! file ) {
 									return;
 								}
 								const reader = new FileReader();
 								reader.onload = () => {
-									const text = String(
-										reader.result ?? ''
-									);
+									const text = String( reader.result ?? '' );
 									setBundle( text );
 									void submit( text );
 								};

@@ -36,25 +36,7 @@ export function ConnectionCard( { data, apply }: Props ) {
 						{ __( 'Connected as', 'ai-provider-for-chatgpt' ) }
 					</th>
 					<td>
-						<code>
-							{ data.email ? maskedDots( 12 ) : '—' }
-						</code>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						{ __( 'ChatGPT plan', 'ai-provider-for-chatgpt' ) }
-					</th>
-					<td>
-						<code>{ data.plan_type ?? '—' }</code>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						{ __( 'Account ID', 'ai-provider-for-chatgpt' ) }
-					</th>
-					<td>
-						<code>{ maskedDots( 24 ) }</code>
+						<code>{ data.email ? maskedDots( 12 ) : '—' }</code>
 					</td>
 				</tr>
 				<tr>
