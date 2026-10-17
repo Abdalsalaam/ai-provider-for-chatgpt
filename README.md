@@ -61,7 +61,7 @@ Accounts without plan usage (Free) are refused at sign-in with a message, and no
 
 ### Upgrading from 0.1.x
 
-0.2.0 removes the Codex-based connection. On the first admin page load after the update, the old connection is deleted and administrators see a notice to sign in again. The companion command line tool `@abdalsalaam/chatgpt-wp-connect` is no longer needed and is deprecated on npm.
+0.2.0 replaces the connection method of 0.1.x. On the first admin page load after the update, the old connection is deleted and administrators see a notice to sign in again. The companion command line tool `@abdalsalaam/chatgpt-wp-connect` is no longer needed and is deprecated on npm.
 
 ## Configuration
 

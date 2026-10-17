@@ -64,7 +64,7 @@ In your ChatGPT settings at [https://chatgpt.com/settings/usage](https://chatgpt
 
 = I used version 0.1.x. What changes? =
 
-Version 0.2.0 connects with Sign in with ChatGPT and no longer uses the command line tool, `auth.json` files or the Codex service. Existing connections are removed on update; sign in again under **Settings > ChatGPT**. Free accounts are no longer eligible.
+Version 0.2.0 connects with Sign in with ChatGPT and no longer uses the command line tool or `auth.json` files. Existing connections are removed on update; sign in again under **Settings > ChatGPT**. Free accounts are no longer eligible.
 
 = Does this plugin work without the WordPress AI Client? =
 
