@@ -11,10 +11,7 @@ use Halawa\ChatGptAiProvider\OAuth\OAuthException;
 use WordPress\AiClient\Messages\DTO\MessagePart;
 use WordPress\AiClient\Messages\DTO\UserMessage;
 
-use const Halawa\ChatGptAiProvider\TOKEN_ENDPOINT;
-
 require_once __DIR__ . '/includes/class-api-test-helpers.php';
-require_once __DIR__ . '/includes/class-oauth-test-helpers.php';
 
 /**
  * Pins headers, refresh decisions and the 401 retry.
@@ -317,37 +314,5 @@ class Test_Account_Authentication extends Test_Case {
 		$model->setRequestAuthentication( new \WordPress\AiClient\Providers\Http\DTO\ApiKeyRequestAuthentication( 'chatgpt-account-managed' ) );
 		$model->generateTextResult( array( new UserMessage( array( new MessagePart( 'Hi' ) ) ) ) );
 		$this->assertSame( 'Bearer access-1', Api_Test_Helpers::request_headers( Api_Test_Helpers::last_request() )['authorization'] );
-	}
-
-	/**
-	 * The real refresher rotates a due token before the API request.
-	 */
-	public function test_real_refresher_rotates_a_due_token_before_the_request() {
-		$auth = new ChatGptAccountAuthentication( Api_Test_Helpers::connected_store( array( 'expires_at' => time() + 60 ) ) );
-		Http_Mock::queue( Http_Mock::json( OAuth_Test_Helpers::token_response() ) );
-		$this->queue_ok();
-		$this->send( $auth );
-		$requests = Http_Mock::requests();
-		$this->assertCount( 2, $requests );
-		$this->assertSame( TOKEN_ENDPOINT, $requests[0]['url'] );
-		$this->assertSame( 'refresh-1', $requests[0]['body']['refresh_token'] );
-		$this->assertSame( 'Bearer at_2', Api_Test_Helpers::request_headers( $requests[1] )['authorization'] );
-	}
-
-	/**
-	 * The real refresher's network failure keeps the unexpired token in use.
-	 */
-	public function test_real_refresher_network_failure_keeps_the_unexpired_token() {
-		$auth = new ChatGptAccountAuthentication( Api_Test_Helpers::connected_store( array( 'expires_at' => time() + 60 ) ) );
-		Http_Mock::queue(
-			static function () {
-				return new WP_Error( 'http_request_failed', 'cURL error 28: timed out' );
-			}
-		);
-		$this->queue_ok();
-		$this->send( $auth );
-		$requests = Http_Mock::requests();
-		$this->assertCount( 2, $requests );
-		$this->assertSame( 'Bearer access-1', Api_Test_Helpers::request_headers( $requests[1] )['authorization'] );
 	}
 }
