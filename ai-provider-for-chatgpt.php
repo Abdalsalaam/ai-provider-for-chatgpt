@@ -236,6 +236,34 @@ add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_controllers' );
 
 add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' ) );
 
+/**
+ * Schedules the weekly refresh when a live connection already exists.
+ *
+ * @since 0.2.0
+ *
+ * @return void
+ */
+function activate(): void {
+	$store = new TokenStore();
+	if ( null !== $store->get() && ! $store->needs_signin() ) {
+		TokenRefresher::schedule();
+	}
+}
+
+/**
+ * Removes the weekly refresh; the connection itself is kept.
+ *
+ * @since 0.2.0
+ *
+ * @return void
+ */
+function deactivate(): void {
+	TokenRefresher::unschedule();
+}
+
+register_activation_hook( __FILE__, __NAMESPACE__ . '\\activate' );
+register_deactivation_hook( __FILE__, __NAMESPACE__ . '\\deactivate' );
+
 if ( is_admin() ) {
 	( new SettingsPage() )->register();
 	( new Assets() )->register();

@@ -50,9 +50,20 @@ final class Upgrade {
 	 * @return void
 	 */
 	public function register(): void {
-		add_action( 'admin_init', array( $this, 'maybe_run' ) );
+		add_action( 'admin_init', array( $this, 'on_admin_init' ) );
 		add_action( 'admin_notices', array( $this, 'render_notice' ) );
 		add_action( 'admin_post_' . self::DISMISS_ACTION, array( $this, 'dismiss' ) );
+	}
+
+	/**
+	 * Action callback for admin_init.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @return void
+	 */
+	public function on_admin_init(): void {
+		$this->maybe_run();
 	}
 
 	/**

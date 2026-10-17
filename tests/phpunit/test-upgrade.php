@@ -7,6 +7,7 @@
 
 use Halawa\ChatGptAiProvider\Admin\Upgrade;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
+use Halawa\ChatGptAiProvider\OAuth\TokenRefresher;
 
 /**
  * Covers the 0.1.x to 0.2.0 migration and the reconnect notice.
@@ -77,7 +78,7 @@ class Test_Upgrade extends Test_Case {
 		$this->assertSame( array(), self::option_names( '%ai\_client\_%' ) );
 		$this->assertSame( '1', (string) get_option( Upgrade::NOTICE_OPTION ) );
 		$this->assertSame( '0.2.0', get_option( Upgrade::VERSION_OPTION ) );
-		$this->assertFalse( wp_next_scheduled( 'halawa_chatgpt_refresh_tokens' ) );
+		$this->assertFalse( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
 	}
 
 	/**
@@ -149,14 +150,13 @@ class Test_Upgrade extends Test_Case {
 				'expires_at'    => time() + 3600,
 			)
 		);
-		wp_schedule_event( time() + HOUR_IN_SECONDS, 'weekly', 'halawa_chatgpt_refresh_tokens' );
 		delete_option( Upgrade::VERSION_OPTION );
 
 		( new Upgrade() )->maybe_run();
 
 		$this->assertSame( 'fake-access', ( new TokenStore() )->get_access_token() );
 		$this->assertSame( TokenStore::CORE_API_KEY_PLACEHOLDER, get_option( TokenStore::CORE_API_KEY_OPTION ) );
-		$this->assertNotFalse( wp_next_scheduled( 'halawa_chatgpt_refresh_tokens' ) );
+		$this->assertNotFalse( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
 		$this->assertSame( 'absent', get_option( Upgrade::NOTICE_OPTION, 'absent' ) );
 		$this->assertSame( '0.2.0', get_option( Upgrade::VERSION_OPTION ) );
 	}
@@ -238,13 +238,22 @@ class Test_Upgrade extends Test_Case {
 	}
 
 	/**
+	 * The admin_init callback runs the migration.
+	 */
+	public function test_admin_init_runs_the_migration() {
+		( new Upgrade() )->on_admin_init();
+
+		$this->assertSame( '0.2.0', get_option( Upgrade::VERSION_OPTION ) );
+	}
+
+	/**
 	 * The hooks are registered for admin requests.
 	 */
 	public function test_register_adds_hooks() {
 		$upgrade = new Upgrade();
 		$upgrade->register();
 
-		$this->assertSame( 10, has_action( 'admin_init', array( $upgrade, 'maybe_run' ) ) );
+		$this->assertSame( 10, has_action( 'admin_init', array( $upgrade, 'on_admin_init' ) ) );
 		$this->assertSame( 10, has_action( 'admin_notices', array( $upgrade, 'render_notice' ) ) );
 		$this->assertSame( 10, has_action( 'admin_post_' . Upgrade::DISMISS_ACTION, array( $upgrade, 'dismiss' ) ) );
 	}
