@@ -13,7 +13,6 @@ export const EMPTY_FIELD = 'empty_field';
 // Codes that end the sign-in attempt on the server; other errors may be retried.
 const ATTEMPT_ENDED_CODES = [
 	'no_pending',
-	'state_mismatch',
 	'access_denied',
 	'registration_incomplete',
 	'exchange_failed',

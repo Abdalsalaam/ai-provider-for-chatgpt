@@ -56,7 +56,7 @@ export function ConnectScreen( { status, onConnected }: Props ) {
 
 			<p>
 				{ __(
-					'Plan usage needs a ChatGPT Plus, Pro or Go account. AI requests from this site are billed to that plan. Requests are sent with store set to false, so OpenAI does not keep them for later retrieval; whether your content is used to improve models is governed by the data controls of your ChatGPT account.',
+					"Plan usage needs a ChatGPT Plus, Pro or Go account. AI requests from this site are billed to that plan. Requests are sent with store set to false, so OpenAI does not keep them for later retrieval. OpenAI's privacy policy covers how your content is handled.",
 					'ai-provider-for-chatgpt'
 				) }
 			</p>
