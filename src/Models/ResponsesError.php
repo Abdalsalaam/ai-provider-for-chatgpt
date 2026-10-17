@@ -30,6 +30,15 @@ final class ResponsesError {
 	);
 
 	/**
+	 * Error codes that mean the route does not accept a request parameter.
+	 *
+	 * The first is the plan usage code; the others are the standard API ones.
+	 *
+	 * @var list<string>
+	 */
+	private const PARAM_REJECTION_CODES = array( 'subscription_sharing_unsupported_capability', 'unsupported_parameter', 'unknown_parameter' );
+
+	/**
 	 * Builds the message for an error response.
 	 *
 	 * @since 1.0.0
@@ -73,6 +82,28 @@ final class ResponsesError {
 		}
 		$code = $decoded['error']['code'] ?? null;
 		return is_string( $code ) && '' !== $code ? $code : null;
+	}
+
+	/**
+	 * Whether an error body says the route does not support the given parameter.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $body  Response body.
+	 * @param string $param Request parameter name, for example max_output_tokens.
+	 * @return bool True for a detail naming $param, or an error object on $param with a rejection code.
+	 */
+	public static function rejects_param( string $body, string $param ): bool {
+		$decoded = json_decode( $body, true );
+		if ( ! is_array( $decoded ) ) {
+			return false;
+		}
+		if ( isset( $decoded['detail'] ) && is_string( $decoded['detail'] ) ) {
+			return false !== strpos( $decoded['detail'], $param );
+		}
+		$error = isset( $decoded['error'] ) && is_array( $decoded['error'] ) ? $decoded['error'] : array();
+		return isset( $error['param'], $error['code'] ) && $error['param'] === $param
+			&& in_array( $error['code'], self::PARAM_REJECTION_CODES, true );
 	}
 
 	/**

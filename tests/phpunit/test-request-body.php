@@ -219,7 +219,7 @@ class Test_Request_Body extends Test_Case {
 	 * Forbidden custom options are rejected before any request.
 	 */
 	public function test_forbidden_custom_options_are_rejected_before_any_request() {
-		foreach ( array( 'temperature', 'top_p', 'include', 'metadata', 'user', 'truncation', 'previous_response_id' ) as $key ) {
+		foreach ( array( 'temperature', 'top_p', 'include', 'metadata', 'user', 'truncation', 'previous_response_id', 'background', 'conversation', 'max_tool_calls', 'moderation', 'multi_agent', 'prompt', 'prompt_cache_retention', 'safety_identifier', 'top_logprobs' ) as $key ) {
 			$config = new ModelConfig();
 			$config->setCustomOption( $key, 'x' );
 			try {

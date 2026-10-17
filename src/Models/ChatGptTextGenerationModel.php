@@ -45,7 +45,7 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	 *
 	 * @var list<string>
 	 */
-	private const FORBIDDEN_OPTIONS = array( 'temperature', 'top_p', 'include', 'metadata', 'user', 'truncation', 'previous_response_id' );
+	private const FORBIDDEN_OPTIONS = array( 'temperature', 'top_p', 'include', 'metadata', 'user', 'truncation', 'previous_response_id', 'background', 'conversation', 'max_tool_calls', 'moderation', 'multi_agent', 'prompt', 'prompt_cache_retention', 'safety_identifier', 'top_logprobs' );
 
 	/**
 	 * Body keys the plugin sets itself and custom options may not replace.
@@ -103,16 +103,21 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	}
 
 	/**
-	 * Sends the request and retries once with a refreshed token after HTTP 401.
+	 * Sends the request, retrying once after a 401 and once without max_output_tokens.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param array $prompt      The prompt messages.
-	 * @param bool  $allow_retry Whether a refresh-and-retry is still allowed.
+	 * @param array $prompt          The prompt messages.
+	 * @param bool  $allow_retry     Whether a refresh-and-retry is still allowed.
+	 * @param bool  $send_max_tokens Whether max_output_tokens may be sent.
 	 * @return GenerativeAiResult The parsed result.
 	 * @throws RuntimeException When the API returns an error.
 	 */
-	private function sendWithRefreshRetry( array $prompt, bool $allow_retry ): GenerativeAiResult {
+	private function sendWithRefreshRetry( array $prompt, bool $allow_retry, bool $send_max_tokens = true ): GenerativeAiResult {
+		$params = $this->prepareGenerateTextParams( $prompt );
+		if ( ! $send_max_tokens ) {
+			unset( $params['max_output_tokens'] );
+		}
 		$auth     = $this->getRequestAuthentication();
 		$request  = $auth->authenticateRequest(
 			new Request(
@@ -122,7 +127,7 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 					'Content-Type' => 'application/json',
 					'Accept'       => 'text/event-stream',
 				),
-				$this->prepareGenerateTextParams( $prompt ),
+				$params,
 				$this->getRequestOptions()
 			)
 		);
@@ -133,7 +138,13 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 		if ( 401 === $status && $allow_retry && $auth instanceof ChatGptAccountAuthentication
 			&& $auth->force_refresh( (string) preg_replace( '/^Bearer\s+/i', '', (string) $request->getHeaderAsString( 'Authorization' ) ) )
 		) {
-			return $this->sendWithRefreshRetry( $prompt, false );
+			return $this->sendWithRefreshRetry( $prompt, false, $send_max_tokens );
+		}
+		// OpenAI lists max_output_tokens as unsupported on this route, so drop it once if rejected.
+		if ( 400 === $status && isset( $params['max_output_tokens'] )
+			&& ResponsesError::rejects_param( (string) $response->getBody(), 'max_output_tokens' )
+		) {
+			return $this->sendWithRefreshRetry( $prompt, $allow_retry, false );
 		}
 		if ( $status < 200 || $status >= 300 ) {
 			throw new RuntimeException(
