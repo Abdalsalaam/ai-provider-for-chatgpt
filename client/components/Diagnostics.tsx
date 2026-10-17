@@ -7,8 +7,13 @@ function tick( ok: boolean ): string {
 	return ok ? '✓' : '✗';
 }
 
-export function Diagnostics() {
-	const { diagnostics, probe, refetch, runRemoteProbe } = useDiagnostics();
+type Props = {
+	statusKey?: string;
+};
+
+export function Diagnostics( { statusKey }: Props ) {
+	const { diagnostics, probe, refetch, runRemoteProbe } =
+		useDiagnostics( statusKey );
 
 	return (
 		<>

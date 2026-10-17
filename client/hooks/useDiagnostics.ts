@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from '@wordpress/element';
+import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 
 import { api } from '../api/client';
 import { errorMessage } from '../utils';
@@ -16,7 +16,7 @@ type ProbeState = {
 	error: string | null;
 };
 
-export function useDiagnostics() {
+export function useDiagnostics( statusKey?: string ) {
 	const [ diagnostics, setDiagnostics ] = useState< DiagnosticsState >( {
 		data: null,
 		loading: true,
@@ -64,6 +64,19 @@ export function useDiagnostics() {
 			cancelled = true;
 		};
 	}, [] );
+
+	// Re-run the checks when the connection changes, but not for the first status load.
+	const lastKey = useRef< string | undefined >( statusKey );
+	useEffect( () => {
+		if ( statusKey === undefined ) {
+			return;
+		}
+		if ( lastKey.current !== undefined && lastKey.current !== statusKey ) {
+			setProbe( { data: null, loading: false, error: null } );
+			void refetch();
+		}
+		lastKey.current = statusKey;
+	}, [ statusKey, refetch ] );
 
 	const runRemoteProbe = useCallback( async () => {
 		setProbe( { data: null, loading: true, error: null } );
