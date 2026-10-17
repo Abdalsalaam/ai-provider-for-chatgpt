@@ -69,11 +69,11 @@ ChatGPT Plus, Pro and Go accounts. OpenAI grants plan usage to other apps only o
 
 = How do I connect a different ChatGPT account? =
 
-Disconnect keeps the site's registration with OpenAI, so the next sign-in reuses it and must use the same ChatGPT account. To switch accounts, click **Use a different ChatGPT account** on **Settings > ChatGPT**. It revokes any stored tokens and deletes the site's copy of the registration (the issued client id and the account's id, email and name); the app stays listed in your ChatGPT settings, where you can remove it. Then sign in with the other account.
+Disconnect keeps the site's registration with OpenAI, so the next sign-in reuses it and must use the same ChatGPT account. To switch accounts, click **Use a different ChatGPT account** on **Settings > ChatGPT**. It revokes any stored tokens and deletes the site's copy of the registration (the issued client id and the account's id, email and name); the app stays listed under ChatGPT **Settings > Security and login > Sign in with ChatGPT**, where you can disconnect it. Then sign in with the other account.
 
 = Where do I manage usage? =
 
-In your ChatGPT settings at [https://chatgpt.com/settings/usage](https://chatgpt.com/settings/usage). The settings screen links there with **Manage usage in ChatGPT**. You can also disconnect the plugin from that page.
+Usage and per-app limits are at [https://chatgpt.com/settings/usage](https://chatgpt.com/settings/usage). The settings screen links there with **Manage usage in ChatGPT**. To disconnect the plugin from your ChatGPT account, go to ChatGPT **Settings > Security and login > Sign in with ChatGPT** and select **Disconnect**.
 
 = I used version 0.1.x. What changes? =
 
@@ -89,7 +89,7 @@ No. This release covers text generation, chat, tool use, structured output and i
 
 = Can the plugin developer see my ChatGPT account? =
 
-No. This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. Your website keeps the connection encrypted in its own database and talks to OpenAI directly; the plugin contacts no other service (see **External services**). The connection cannot read your ChatGPT conversations or memories: it only lets your site use your plan for AI requests, as OpenAI explains in [Using your ChatGPT plan in other apps and sites](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites) and in the [Sign in with ChatGPT documentation](https://developers.openai.com/siwc/token-sharing-open-source). You can disconnect at any time on **Settings > ChatGPT** or in your ChatGPT settings.
+No. This plugin runs only on your website. The plugin developer never receives your ChatGPT sign-in, your tokens or anything you send, and has no way to see or use your account. Your website keeps the connection encrypted in its own database and talks to OpenAI directly; the plugin contacts no other service (see **External services**). The connection cannot read your ChatGPT conversations or memories; it only lets your site use your plan for AI requests. OpenAI says so in [Using your ChatGPT plan in other apps and sites](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites) (conversations and memories) and in the [Sign in with ChatGPT documentation](https://developers.openai.com/siwc/token-sharing-open-source) (conversations). You can disconnect at any time on **Settings > ChatGPT**, or under ChatGPT **Settings > Security and login > Sign in with ChatGPT**.
 
 = How are tokens stored? =
 
