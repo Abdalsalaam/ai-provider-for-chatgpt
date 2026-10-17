@@ -29,6 +29,17 @@ class Test_Uninstall extends Test_Case {
 		foreach ( $options as $option ) {
 			update_option( $option, 'x', false );
 		}
+		// The tokens option holds a signed-out registration, the record a disconnect keeps.
+		( new Halawa\ChatGptAiProvider\Authentication\TokenStore() )->save(
+			array(
+				'client_id'     => 'oaiapp_test',
+				'subject'       => 'user_test',
+				'access_token'  => 'fake-access',
+				'refresh_token' => 'fake-refresh',
+			)
+		);
+		( new Halawa\ChatGptAiProvider\Authentication\TokenStore() )->sign_out();
+		$this->assertTrue( ( new Halawa\ChatGptAiProvider\Authentication\TokenStore() )->has_registration() );
 		set_transient( 'halawa_chatgpt_jwks', '{"keys":[]}', DAY_IN_SECONDS );
 		set_transient( 'halawa_chatgpt_pending_signin_1', array( 'state' => 's' ), 600 );
 		set_transient( 'halawa_chatgpt_pending_signin_2', array( 'state' => 's' ), 600 );

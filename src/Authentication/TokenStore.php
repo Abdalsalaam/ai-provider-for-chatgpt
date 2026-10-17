@@ -50,6 +50,11 @@ class TokenStore {
 	public const RECORD_VERSION = 2;
 
 	/**
+	 * Fields kept after sign-out so the next sign-in reuses the registration.
+	 */
+	public const REGISTRATION_FIELDS = array( 'client_id', 'ext_agent_host_id', 'subject', 'email', 'name' );
+
+	/**
 	 * Returns the version 2 record, or null when absent or not version 2.
 	 *
 	 * @since 0.1.0
@@ -127,7 +132,52 @@ class TokenStore {
 	}
 
 	/**
-	 * Removes the record and the core placeholder.
+	 * Drops the tokens but keeps the registration for the next sign-in.
+	 *
+	 * OpenAI expects a signed-out app to reuse its issued client id for the same
+	 * host, so client_id, ext_agent_host_id, subject, email and name stay.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return void
+	 */
+	public function sign_out(): void {
+		$record = $this->get();
+		if ( null === $record ) {
+			return;
+		}
+		$remnant                 = array_intersect_key( $record, array_flip( self::REGISTRATION_FIELDS ) );
+		$remnant['version']      = self::RECORD_VERSION;
+		$remnant['needs_signin'] = false;
+		$this->write( $remnant );
+		delete_option( self::CORE_API_KEY_OPTION );
+		TokenRefresher::unschedule();
+	}
+
+	/**
+	 * Returns true when tokens are stored and no new sign-in is needed.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool True when the provider can call OpenAI.
+	 */
+	public function is_connected(): bool {
+		return null !== $this->get_access_token() && null !== $this->get_refresh_token() && ! $this->needs_signin();
+	}
+
+	/**
+	 * Returns true when an issued client id is stored, with or without tokens.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool True when a registration exists.
+	 */
+	public function has_registration(): bool {
+		return null !== $this->get_client_id();
+	}
+
+	/**
+	 * Removes the record, including the registration, and the core placeholder.
 	 *
 	 * @since 0.1.0
 	 *

@@ -462,4 +462,18 @@ class Test_Token_Refresher extends Test_Case {
 		TokenRefresher::run_cron();
 		$this->assertCount( 2, Http_Mock::requests() );
 	}
+
+	/**
+	 * A signed-out registration is never scheduled or refreshed by cron.
+	 */
+	public function test_remnant_gets_no_cron() {
+		$this->save_expiring_in( 3600 );
+		$this->store->sign_out();
+
+		TokenRefresher::schedule();
+		$this->assertFalse( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
+
+		TokenRefresher::run_cron();
+		$this->assertCount( 0, Http_Mock::requests() );
+	}
 }

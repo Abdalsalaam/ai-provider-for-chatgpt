@@ -306,9 +306,9 @@ class Test_Connection_Controller extends Test_Case {
 	}
 
 	/**
-	 * Disconnect revokes, then clears everything the connection created.
+	 * Disconnect revokes, then keeps only the registration.
 	 */
-	public function test_disconnect_revokes_then_clears() {
+	public function test_disconnect_revokes_then_signs_out() {
 		update_option( 'halawa_chatgpt_installation_id', '0b6a2c8e-1f0d-4c55-9a3e-6f1b2d7c9e10', false );
 		( new TokenStore() )->save( OAuth_Test_Helpers::record() );
 		update_option( SignInFlow::FIRST_NOTICE_OPTION, 1, false );
@@ -319,9 +319,20 @@ class Test_Connection_Controller extends Test_Case {
 
 		$this->assertTrue( $data['revoked'] );
 		$this->assertFalse( $data['connected'] );
+		$this->assertFalse( $data['needs_signin'] );
+		$this->assertFalse( $data['plan_usage_enabled'] );
+		$this->assertNull( $data['expires_at'] );
+		$this->assertSame( 'oaiapp_x', $data['client_id'] );
+		$this->assertSame( 'ada@example.com', $data['email'] );
 		$this->assertSame( 'https://auth.openai.com/api/accounts/oauth/revoke', Http_Mock::requests()[0]['url'] );
 		$this->assertSame( 'rt_1', Http_Mock::requests()[0]['body']['token'] );
-		$this->assertFalse( get_option( TokenStore::OPTION_NAME ) );
+
+		$store = new TokenStore();
+		$this->assertNull( $store->get_access_token() );
+		$this->assertNull( $store->get_refresh_token() );
+		$this->assertNull( $store->get_id_token() );
+		$this->assertSame( 'oaiapp_x', $store->get_client_id() );
+		$this->assertSame( 'user_1', $store->get_subject() );
 		$this->assertSame( 'absent', get_option( TokenStore::CORE_API_KEY_OPTION, 'absent' ) );
 		$this->assertFalse( get_option( SignInFlow::FIRST_NOTICE_OPTION ) );
 		$this->assertFalse( get_transient( SignInFlow::pending_key( self::$admin ) ) );
@@ -330,14 +341,66 @@ class Test_Connection_Controller extends Test_Case {
 	}
 
 	/**
-	 * A failed revoke still disconnects and reports revoked false.
+	 * After a sign-out the next sign-in reuses the issued client id.
+	 */
+	public function test_sign_in_after_disconnect_reuses_client_id() {
+		( new TokenStore() )->save( OAuth_Test_Helpers::record() );
+		Http_Mock::queue( Http_Mock::json( array() ) );
+		$this->dispatch( 'DELETE', '/connection' );
+
+		$url = $this->dispatch( 'POST', '/connection/sign-in' )->get_data()['authorize_url'];
+		parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $params );
+
+		$this->assertSame( 'oaiapp_x', $params['client_id'] );
+		$this->assertSame( 'ada@example.com', $params['login_hint'] );
+		$this->assertArrayNotHasKey( 'agent_name_hint', $params );
+		$this->assertArrayNotHasKey( 'id_token_hint', $params );
+	}
+
+	/**
+	 * Forget removes the registration so another account can register.
+	 */
+	public function test_disconnect_with_forget_removes_registration() {
+		update_option( 'halawa_chatgpt_installation_id', '0b6a2c8e-1f0d-4c55-9a3e-6f1b2d7c9e10', false );
+		( new TokenStore() )->save( OAuth_Test_Helpers::record() );
+		Http_Mock::queue( Http_Mock::json( array() ) );
+
+		$data = $this->dispatch( 'DELETE', '/connection', array( 'forget' => true ) )->get_data();
+
+		$this->assertTrue( $data['revoked'] );
+		$this->assertNull( $data['client_id'] );
+		$this->assertNull( $data['email'] );
+		$this->assertFalse( get_option( TokenStore::OPTION_NAME ) );
+		$this->assertSame( '0b6a2c8e-1f0d-4c55-9a3e-6f1b2d7c9e10', get_option( 'halawa_chatgpt_installation_id' ) );
+
+		$url = $this->dispatch( 'POST', '/connection/sign-in' )->get_data()['authorize_url'];
+		parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $params );
+		$this->assertSame( 'dynamic_agent_client', $params['client_id'] );
+		$this->assertArrayNotHasKey( 'login_hint', $params );
+	}
+
+	/**
+	 * Forget on a signed-out registration makes no HTTP call.
+	 */
+	public function test_forget_after_sign_out() {
+		( new TokenStore() )->save( OAuth_Test_Helpers::record() );
+		( new TokenStore() )->sign_out();
+		$data = $this->dispatch( 'DELETE', '/connection', array( 'forget' => '1' ) )->get_data();
+		$this->assertFalse( $data['revoked'] );
+		$this->assertCount( 0, Http_Mock::requests() );
+		$this->assertFalse( get_option( TokenStore::OPTION_NAME ) );
+	}
+
+	/**
+	 * A failed revoke still signs out and reports revoked false.
 	 */
 	public function test_disconnect_when_revoke_fails() {
 		( new TokenStore() )->save( OAuth_Test_Helpers::record() );
 		Http_Mock::queue( new WP_Error( 'http_request_failed', 'timeout' ) );
 		$data = $this->dispatch( 'DELETE', '/connection' )->get_data();
 		$this->assertFalse( $data['revoked'] );
-		$this->assertFalse( get_option( TokenStore::OPTION_NAME ) );
+		$this->assertFalse( $data['connected'] );
+		$this->assertNull( ( new TokenStore() )->get_refresh_token() );
 	}
 
 	/**
@@ -348,6 +411,7 @@ class Test_Connection_Controller extends Test_Case {
 		$this->assertFalse( $data['revoked'] );
 		$this->assertCount( 0, Http_Mock::requests() );
 	}
+
 	/**
 	 * A busy refresh lock gives 409 refresh_in_progress and no HTTP call.
 	 */
@@ -362,5 +426,37 @@ class Test_Connection_Controller extends Test_Case {
 		$this->assertSame( 'refresh_in_progress', $response->get_data()['code'] );
 		$this->assertCount( 0, Http_Mock::requests() );
 		$wpdb->delete( $wpdb->options, array( 'option_name' => TokenRefresher::LOCK_OPTION ) );
+	}
+
+	/**
+	 * A signed-out registration reports not connected and leaves the provider unconfigured.
+	 */
+	public function test_status_for_signed_out_registration() {
+		$store = new TokenStore();
+		$store->save( OAuth_Test_Helpers::record() );
+		$store->sign_out();
+
+		$data = $this->dispatch( 'GET', '/connection' )->get_data();
+
+		$this->assertFalse( $data['connected'] );
+		$this->assertFalse( $data['needs_signin'] );
+		$this->assertFalse( $data['plan_usage_enabled'] );
+		$this->assertNull( $data['expires_at'] );
+		$this->assertSame( array(), $data['scopes'] );
+		$this->assertSame( 'oaiapp_x', $data['client_id'] );
+		$this->assertSame( 'ada@example.com', $data['email'] );
+		$this->assertSame( 'absent', get_option( TokenStore::CORE_API_KEY_OPTION, 'absent' ) );
+		$this->assertNull( $store->get_access_token() );
+	}
+
+	/**
+	 * Forget needs manage_options like the other routes.
+	 */
+	public function test_forget_needs_manage_options() {
+		( new TokenStore() )->save( OAuth_Test_Helpers::record() );
+		wp_set_current_user( self::$subscriber );
+		$this->assertSame( 403, $this->dispatch( 'DELETE', '/connection', array( 'forget' => true ) )->get_status() );
+		$this->assertSame( 'oaiapp_x', ( new TokenStore() )->get_client_id() );
+		$this->assertCount( 0, Http_Mock::requests() );
 	}
 }

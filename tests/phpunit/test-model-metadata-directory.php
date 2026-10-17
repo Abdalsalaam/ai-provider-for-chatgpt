@@ -172,6 +172,30 @@ class Test_Model_Metadata_Directory extends Test_Case {
 	}
 
 	/**
+	 * A signed-out registration lists no models and sends nothing, like no record.
+	 */
+	public function test_signed_out_registration_lists_no_models_and_sends_nothing() {
+		$store = new TokenStore();
+		$store->save(
+			array(
+				'client_id'     => 'oaiapp_test',
+				'subject'       => 'user_test',
+				'access_token'  => 'fake-access',
+				'refresh_token' => 'fake-refresh',
+				'expires_at'    => time() + 3600,
+			)
+		);
+		$store->sign_out();
+		try {
+			$this->directory( $store )->listModelMetadata();
+			$this->fail( 'No exception' );
+		} catch ( RuntimeException $e ) {
+			$this->assertSame( ChatGptAccountAuthentication::NOT_CONNECTED, $e->getMessage() );
+		}
+		$this->assertSame( array(), Http_Mock::requests() );
+	}
+
+	/**
 	 * A record that needs a new sign-in still lists models, without calling OpenAI.
 	 */
 	public function test_session_ended_lists_the_bundled_models_without_a_request() {

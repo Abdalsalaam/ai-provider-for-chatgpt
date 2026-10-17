@@ -86,4 +86,16 @@ class Test_Activation extends Test_Case {
 		$this->assertSame( 10, has_action( 'activate_' . $basename, 'Halawa\\ChatGptAiProvider\\activate' ) );
 		$this->assertSame( 10, has_action( 'deactivate_' . $basename, 'Halawa\\ChatGptAiProvider\\deactivate' ) );
 	}
+
+	/**
+	 * A signed-out registration has no tokens to keep alive, so nothing is scheduled.
+	 */
+	public function test_activation_with_signed_out_registration_schedules_nothing() {
+		self::seed_record_without_cron();
+		( new TokenStore() )->sign_out();
+
+		\Halawa\ChatGptAiProvider\activate();
+
+		$this->assertFalse( wp_next_scheduled( TokenRefresher::CRON_HOOK ) );
+	}
 }

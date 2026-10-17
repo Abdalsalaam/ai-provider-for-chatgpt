@@ -106,8 +106,8 @@ final class Upgrade {
 		if ( ! current_user_can( 'manage_options' ) || ! get_option( self::NOTICE_OPTION ) ) {
 			return;
 		}
-		// A new sign-in answers the notice, so it is not shown again.
-		if ( null !== $this->store->get() ) {
+		// A new sign-in answers the notice; a signed-out registration does not.
+		if ( $this->store->is_connected() ) {
 			delete_option( self::NOTICE_OPTION );
 			return;
 		}
