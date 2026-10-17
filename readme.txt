@@ -67,6 +67,10 @@ After you approve, ChatGPT sends your browser to `http://127.0.0.1:1455/auth/cal
 
 ChatGPT Plus, Pro and Go accounts. OpenAI grants plan usage to other apps only on these plans. If your account does not grant plan usage, the plugin shows a message and saves nothing.
 
+= How do I connect a different ChatGPT account? =
+
+Disconnect keeps the site's registration with OpenAI, so the next sign-in reuses it and must use the same ChatGPT account. To switch accounts, click **Use a different ChatGPT account** on **Settings > ChatGPT**. It revokes any stored tokens and deletes the registration (the issued client id and the account's id, email and name). Then sign in with the other account.
+
 = Where do I manage usage? =
 
 In your ChatGPT settings at [https://chatgpt.com/settings/usage](https://chatgpt.com/settings/usage). The settings screen links there with **Manage usage in ChatGPT**. You can also disconnect the plugin from that page.
@@ -119,7 +123,7 @@ These services are provided by OpenAI. By connecting an account and using this p
 * Existing connections must sign in again after updating; the plugin shows a notice.
 * Free ChatGPT accounts are no longer eligible, because OpenAI grants plan usage only to Plus, Pro and Go.
 * Added a weekly token refresh and a link to manage usage in ChatGPT.
-* Disconnect now revokes the connection at OpenAI.
+* Disconnect revokes the connection at OpenAI and keeps the registration, so signing in again reuses it.
 * Uninstall now removes every option, transient and scheduled event the plugin creates.
 
 = 0.1.4 =
