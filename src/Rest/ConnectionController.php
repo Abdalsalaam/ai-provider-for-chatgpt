@@ -124,10 +124,11 @@ class ConnectionController extends WP_REST_Controller {
 							'sanitize_callback' => static function ( $value ) {
 								return is_string( $value ) ? trim( wp_unslash( $value ) ) : '';
 							},
+							// Only size and emptiness here, so CallbackUrl can explain a wrong paste.
 							'validate_callback' => static function ( $value ) {
 								return is_string( $value )
 									&& strlen( $value ) <= CallbackUrl::MAX_LENGTH
-									&& 1 === preg_match( '#^\s*https?://#i', $value );
+									&& '' !== trim( $value );
 							},
 						),
 					),

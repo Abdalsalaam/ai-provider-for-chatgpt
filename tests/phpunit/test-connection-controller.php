@@ -195,10 +195,24 @@ class Test_Connection_Controller extends Test_Case {
 	 */
 	public function test_callback_url_validation() {
 		$this->assertSame( 400, $this->dispatch( 'POST', '/connection/callback' )->get_status() );
-		$this->assertSame( 400, $this->dispatch( 'POST', '/connection/callback', array( 'callback_url' => 'ftp://127.0.0.1/x' ) )->get_status() );
+		$this->assertSame( 'rest_invalid_param', $this->dispatch( 'POST', '/connection/callback', array( 'callback_url' => '   ' ) )->get_data()['code'] );
 		$this->assertSame( 400, $this->dispatch( 'POST', '/connection/callback', array( 'callback_url' => 'http://127.0.0.1:1455/auth/callback?code=' . str_repeat( 'a', 16384 ) ) )->get_status() );
 		$this->assertSame( 400, $this->dispatch( 'POST', '/connection/callback', array( 'callback_url' => array( 'x' ) ) )->get_status() );
-		$this->assertSame( 'rest_invalid_param', $this->dispatch( 'POST', '/connection/callback', array( 'callback_url' => 'nope' ) )->get_data()['code'] );
+		$this->assertSame( 'rest_invalid_param', $this->dispatch( 'POST', '/connection/callback', array( 'callback_url' => '' ) )->get_data()['code'] );
+	}
+
+	/**
+	 * An address without a scheme gets the paste instruction, not a generic error.
+	 */
+	public function test_callback_without_scheme_gets_paste_instruction() {
+		$this->dispatch( 'POST', '/connection/sign-in' );
+		foreach ( array( '127.0.0.1:1455/auth/callback?code=a&state=s', 'ftp://127.0.0.1/x' ) as $pasted ) {
+			$response = $this->dispatch( 'POST', '/connection/callback', array( 'callback_url' => $pasted ) );
+			$this->assertSame( 400, $response->get_status() );
+			$this->assertSame( 'bad_callback', $response->get_data()['code'] );
+			$this->assertSame( 'Paste the full address of the page you landed on. It starts with http://127.0.0.1', $response->get_data()['message'] );
+		}
+		$this->assertIsArray( get_transient( SignInFlow::pending_key( self::$admin ) ) );
 	}
 
 	/**
