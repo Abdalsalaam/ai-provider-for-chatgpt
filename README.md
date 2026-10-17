@@ -115,7 +115,7 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 
 - **"This site can't be reached" after approving.** Expected: the tab is on `http://127.0.0.1:1455/auth/callback`, where nothing is listening. Copy its full address and paste it on the settings screen.
 - **"Paste the full address of the page you landed on."** The pasted text is not the `http://127.0.0.1:1455/auth/callback?...` address. Copy the whole address bar, not the ChatGPT page.
-- **"Could not read the clipboard."** The browser blocked clipboard access (common when the admin is not on HTTPS). Paste the address with Ctrl+V or Cmd+V.
+- **"Could not read the clipboard."** The browser denied clipboard access. Paste the address with Ctrl+V or Cmd+V. On sites without HTTPS the button is not shown.
 - **The sign-in attempt expired, or "No sign-in in progress".** Each attempt is valid for 10 minutes and once. Click **Start again**.
 - **"Your ChatGPT account did not grant plan usage".** Plan usage needs ChatGPT Plus, Pro or Go.
 - **"ChatGPT session ended".** OpenAI ended the session (for example after you disconnected the app in ChatGPT). Sign in again under **Settings > ChatGPT**.
