@@ -62,28 +62,81 @@ body.settings_page_ai-provider-for-chatgpt #wpcontent {
 	color: #50575e;
 }
 
-/* OpenAI's sign-in button guidance: black button, white text and logo. */
+/* OpenAI's black sign-in button, set via the component's own variables. */
 .ai-provider-for-chatgpt-continue {
-	background: #000;
-	color: #fff;
+	--wp-ui-button-background-color: #000;
+	--wp-ui-button-background-color-active: #2b2b2b;
+	--wp-ui-button-foreground-color: #fff;
+	--wp-ui-button-foreground-color-active: #fff;
 	gap: 8px;
 }
 
-.ai-provider-for-chatgpt-continue:hover:not( [disabled] ) {
-	background: #2b2b2b;
-}
-
 .ai-provider-for-chatgpt-continue:focus-visible {
-	outline: 2px solid var( --wp-admin-theme-color, #3858e9 );
+	outline: 2px solid var(--wp-admin-theme-color, #3858e9);
 	outline-offset: 2px;
-}
-
-.ai-provider-for-chatgpt-continue[disabled] {
-	background: #6b6b6b;
-	cursor: default;
 }
 
 .ai-provider-for-chatgpt-continue-icon {
 	width: 18px;
 	height: 18px;
+}
+
+.ai-provider-for-chatgpt-steps-title {
+	margin: 1.5em 0 0.5em;
+	font-size: 14px;
+}
+
+.ai-provider-for-chatgpt-steps {
+	margin: 0 0 1em 1.5em;
+}
+
+.ai-provider-for-chatgpt-steps li {
+	margin-bottom: 0.4em;
+	padding-left: 0.25em;
+}
+
+/* Steps 3 and 4 are where the admin is once the sign-in tab is open. */
+.ai-provider-for-chatgpt-steps li.is-current {
+	font-weight: 600;
+	border-left: 3px solid var(--wp-admin-theme-color, #3858e9);
+	margin-left: -0.5em;
+	padding-left: calc(0.75em - 3px);
+}
+
+.ai-provider-for-chatgpt-addressbar {
+	margin: 0 0 1em;
+}
+
+.ai-provider-for-chatgpt-addressbar-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	border: 1px solid #c3c4c7;
+	border-radius: 16px;
+	background: #f0f0f1;
+	overflow-x: auto;
+}
+
+.ai-provider-for-chatgpt-addressbar-bar code {
+	padding: 0;
+	background: none;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.ai-provider-for-chatgpt-addressbar-dots {
+	flex: none;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #8c8f94;
+	box-shadow: 12px 0 0 #8c8f94, 24px 0 0 #8c8f94;
+	margin-right: 24px;
+}
+
+.ai-provider-for-chatgpt-addressbar figcaption {
+	margin-top: 4px;
+	color: #50575e;
+	font-size: 12px;
 }
