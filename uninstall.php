@@ -85,6 +85,9 @@ if ( ! function_exists( 'halawa_chatgpt_uninstall' ) ) {
 			'halawa_chatgpt_upgrade_notice',
 			'halawa_chatgpt_thread_id',
 			'halawa_chatgpt_pair_active',
+			'halawa_chatgpt_default_model',
+			'halawa_chatgpt_reasoning_effort',
+			'halawa_chatgpt_model_efforts',
 			// Flags the connector as configured on the core Settings > Connectors screen.
 			'connectors_ai_chatgpt_api_key',
 		);

@@ -13,6 +13,7 @@ use WP_Error;
 use WP_REST_Controller;
 use WP_REST_Response;
 use WP_REST_Server;
+use Halawa\ChatGptAiProvider\Settings\ModelSettings;
 
 /**
  * REST controller for clearing the AI client's cached model list.
@@ -94,6 +95,7 @@ class CacheController extends WP_REST_Controller {
 		if ( wp_using_ext_object_cache() ) {
 			wp_cache_flush_group( 'transient' );
 		}
+		ModelSettings::invalidate_model_list();
 		return new WP_REST_Response( array( 'deleted' => $deleted ), 200 );
 	}
 }

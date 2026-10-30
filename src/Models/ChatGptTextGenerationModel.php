@@ -30,6 +30,7 @@ use WordPress\AiClient\Tools\DTO\FunctionDeclaration;
 use Halawa\ChatGptAiProvider\Authentication\ChatGptAccountAuthentication;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
+use Halawa\ChatGptAiProvider\Settings\ModelSettings;
 
 /**
  * Text generation model for the Responses API at api.openai.com.
@@ -103,21 +104,24 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 	}
 
 	/**
-	 * Sends the request, retrying once after a 401 and once without max_output_tokens.
+	 * Sends the request, retrying once after a 401, once without max_output_tokens
+	 * and once without the site's reasoning effort.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @param array $prompt          The prompt messages.
 	 * @param bool  $allow_retry     Whether a refresh-and-retry is still allowed.
 	 * @param bool  $send_max_tokens Whether max_output_tokens may be sent.
+	 * @param bool  $send_effort     Whether the site's reasoning effort may be added.
 	 * @return GenerativeAiResult The parsed result.
 	 * @throws RuntimeException When the API returns an error.
 	 */
-	private function sendWithRefreshRetry( array $prompt, bool $allow_retry, bool $send_max_tokens = true ): GenerativeAiResult {
+	private function sendWithRefreshRetry( array $prompt, bool $allow_retry, bool $send_max_tokens = true, bool $send_effort = true ): GenerativeAiResult {
 		$params = $this->prepareGenerateTextParams( $prompt );
 		if ( ! $send_max_tokens ) {
 			unset( $params['max_output_tokens'] );
 		}
+		$added_effort = $send_effort && $this->add_site_effort( $params );
 		$auth     = $this->getRequestAuthentication();
 		$request  = $auth->authenticateRequest(
 			new Request(
@@ -138,13 +142,18 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 		if ( 401 === $status && $allow_retry && $auth instanceof ChatGptAccountAuthentication
 			&& $auth->force_refresh( (string) preg_replace( '/^Bearer\s+/i', '', (string) $request->getHeaderAsString( 'Authorization' ) ) )
 		) {
-			return $this->sendWithRefreshRetry( $prompt, false, $send_max_tokens );
+			return $this->sendWithRefreshRetry( $prompt, false, $send_max_tokens, $send_effort );
 		}
 		// OpenAI lists max_output_tokens as unsupported on this route, so drop it once if rejected.
 		if ( 400 === $status && isset( $params['max_output_tokens'] )
 			&& ResponsesError::rejects_param( (string) $response->getBody(), 'max_output_tokens' )
 		) {
-			return $this->sendWithRefreshRetry( $prompt, $allow_retry, false );
+			return $this->sendWithRefreshRetry( $prompt, $allow_retry, false, $send_effort );
+		}
+		// A route that rejects the site's effort is remembered so later prompts skip it.
+		if ( 400 === $status && $added_effort && ResponsesError::rejects_reasoning( (string) $response->getBody() ) ) {
+			ModelSettings::mark_rejected( $this->metadata()->getId() );
+			return $this->sendWithRefreshRetry( $prompt, $allow_retry, $send_max_tokens, false );
 		}
 		if ( $status < 200 || $status >= 300 ) {
 			throw new RuntimeException(
@@ -152,6 +161,31 @@ class ChatGptTextGenerationModel extends AbstractApiBasedModel implements TextGe
 			);
 		}
 		return $this->parseStreamingResponseToGenerativeAiResult( $response );
+	}
+
+	/**
+	 * Adds the site's reasoning effort unless the caller already set one.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param array<string, mixed> $params The request body, changed in place.
+	 * @return bool Whether an effort was added.
+	 */
+	private function add_site_effort( array &$params ): bool {
+		$effort = ModelSettings::effort_for( $this->metadata()->getId() );
+		if ( '' === $effort ) {
+			return false;
+		}
+		if ( ! isset( $params['reasoning'] ) ) {
+			$params['reasoning'] = array( 'effort' => $effort );
+			return true;
+		}
+		// A caller's reasoning object without an effort, such as a summary request, gets the site's.
+		if ( is_array( $params['reasoning'] ) && ! isset( $params['reasoning']['effort'] ) ) {
+			$params['reasoning']['effort'] = $effort;
+			return true;
+		}
+		return false;
 	}
 
 	/**

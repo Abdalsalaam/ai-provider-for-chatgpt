@@ -9,6 +9,7 @@ import type {
 	ConnectionStatus,
 	Diagnostics,
 	DisconnectResult,
+	ModelSettings,
 	RefreshResult,
 	RemoteModelsProbe,
 	SignInStart,
@@ -74,6 +75,27 @@ export const api = {
 		return apiFetch< RemoteModelsProbe >( {
 			path: `/${ NS }/diagnostics/remote-models`,
 			method: 'GET',
+		} );
+	},
+
+	getSettings(): Promise< ModelSettings > {
+		return apiFetch< ModelSettings >( {
+			path: `/${ NS }/settings`,
+			method: 'GET',
+		} );
+	},
+
+	saveSettings(
+		defaultModel: string,
+		reasoningEffort: string
+	): Promise< ModelSettings > {
+		return apiFetch< ModelSettings >( {
+			path: `/${ NS }/settings`,
+			method: 'POST',
+			data: {
+				default_model: defaultModel,
+				reasoning_effort: reasoningEffort,
+			},
 		} );
 	},
 

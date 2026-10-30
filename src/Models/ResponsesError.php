@@ -107,6 +107,29 @@ final class ResponsesError {
 	}
 
 	/**
+	 * Tells whether a 400 body rejects the reasoning parameter or its effort value.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param string $body Response body.
+	 * @return bool
+	 */
+	public static function rejects_reasoning( string $body ): bool {
+		$decoded = json_decode( $body, true );
+		if ( ! is_array( $decoded ) ) {
+			return false;
+		}
+		if ( isset( $decoded['detail'] ) && is_string( $decoded['detail'] ) ) {
+			return false !== stripos( $decoded['detail'], 'reasoning' );
+		}
+		$error = isset( $decoded['error'] ) && is_array( $decoded['error'] ) ? $decoded['error'] : array();
+		$param = $error['param'] ?? null;
+		$codes = array_merge( self::PARAM_REJECTION_CODES, array( 'invalid_value', 'unsupported_value' ) );
+		return is_string( $param ) && 0 === strpos( $param, 'reasoning' )
+			&& isset( $error['code'] ) && in_array( $error['code'], $codes, true );
+	}
+
+	/**
 	 * Flattens response headers to lower-case names and string values.
 	 *
 	 * @since 1.0.0

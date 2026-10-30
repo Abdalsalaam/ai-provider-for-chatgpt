@@ -19,6 +19,7 @@ import { ChatGptIcon } from './components/ChatGptIcon';
 import { ConnectionCard } from './components/ConnectionCard';
 import { ConnectScreen } from './components/ConnectScreen';
 import { Diagnostics } from './components/Diagnostics';
+import { ModelSettingsCard } from './components/ModelSettingsCard';
 import { NoticesArea } from './components/NoticesArea';
 
 const DOCS_URL =
@@ -147,6 +148,22 @@ export function App() {
 										onConnected={ apply }
 									/>
 								) }
+							</Card.Content>
+						</Card.Root>
+					) }
+
+					{ isConnected && (
+						<Card.Root>
+							<Card.Header>
+								<Card.Title>
+									{ __(
+										'Model settings',
+										'ai-provider-for-chatgpt'
+									) }
+								</Card.Title>
+							</Card.Header>
+							<Card.Content>
+								<ModelSettingsCard statusKey={ statusKey } />
 							</Card.Content>
 						</Card.Root>
 					) }

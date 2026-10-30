@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace Halawa\ChatGptAiProvider\Cache;
 
+use Halawa\ChatGptAiProvider\Settings\ModelSettings;
+
 /**
  * Clears the cached AI Client model lists without loading any PSR-16 class.
  *
@@ -39,5 +41,7 @@ final class ModelCache {
 		if ( wp_using_ext_object_cache() && function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_group' ) ) {
 			wp_cache_flush_group( 'transient' );
 		}
+		// WordPress 7 keeps the AI Client's own model list in the object cache, not in a transient.
+		ModelSettings::invalidate_model_list();
 	}
 }

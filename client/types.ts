@@ -77,6 +77,22 @@ export type RemoteModelsProbe = {
 	error: string | null;
 };
 
+export type SettingsModel = {
+	id: string;
+	name: string;
+	// Null when the account's model list did not report them.
+	efforts: string[] | null;
+	default_effort: string | null;
+};
+
+export type ModelSettings = {
+	default_model: string;
+	reasoning_effort: string;
+	models: SettingsModel[];
+	// Plugins the AI plugin's Connector Approval experiment is blocking.
+	approval: { callers: string[]; url: string } | null;
+};
+
 export type CacheClearResult = {
 	deleted: number;
 };

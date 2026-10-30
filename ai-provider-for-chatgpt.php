@@ -5,7 +5,7 @@
  * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9
  * Requires PHP: 7.4
- * Version: 1.0.1
+ * Version: 1.1.0
  * Author: Abdalsalaam Halawa
  * Author URI: https://halawa.io
  * License: GPL-2.0-or-later
@@ -31,6 +31,8 @@ use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 use Halawa\ChatGptAiProvider\Rest\CacheController;
 use Halawa\ChatGptAiProvider\Rest\ConnectionController;
 use Halawa\ChatGptAiProvider\Rest\DiagnosticsController;
+use Halawa\ChatGptAiProvider\Rest\SettingsController;
+use Halawa\ChatGptAiProvider\Settings\ModelSettings;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	return;
@@ -43,7 +45,7 @@ require_once __DIR__ . '/vendor/autoload.php';
  *
  * @since 1.0.0
  */
-const VERSION = '1.0.1';
+const VERSION = '1.1.0';
 
 /**
  * Sign in with ChatGPT endpoints and identifiers (OpenAI open-source app flow).
@@ -216,9 +218,12 @@ function register_rest_controllers(): void {
 	( new ConnectionController( $store ) )->register_routes();
 	( new DiagnosticsController( $store ) )->register_routes();
 	( new CacheController() )->register_routes();
+	( new SettingsController() )->register_routes();
 }
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_controllers' );
+
+ModelSettings::register();
 
 add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' ) );
 
