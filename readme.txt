@@ -3,7 +3,7 @@ Contributors: abdalsalaam
 Tags: chatgpt, openai, ai, connector, ai-provider
 Requires at least: 6.9
 Tested up to: 7.1
-Stable tag: 1.0.1
+Stable tag: 1.1.0
 Requires PHP: 7.4
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -90,6 +90,10 @@ Every model your ChatGPT plan offers is a reasoning model, and by default it rea
 
 A plugin that calls the AI Client can also choose per prompt: `using_provider( 'chatgpt' )` and `using_model_preference( 'model-id' )` pick the model, and a `ModelConfig` passed to `using_model_config()` with the custom option `reasoning` set to `array( 'effort' => 'low' )` sets the effort.
 
+= AI features fail with "An error occurred" or "has not been approved". What is wrong? =
+
+The AI plugin has a Connector Approval experiment. When it is on, every plugin, including the AI plugin itself, must be approved before it can use a connector, and requests from plugins that are not approved fail. Most features show only a generic message such as "An error occurred while resizing content." Go to **Tools > Connector Approvals** and approve the plugin for ChatGPT, or turn the Connector Approval experiment off under **Settings > AI**. **Settings > ChatGPT** shows a notice naming the plugins that are waiting for approval.
+
 = Which API does the plugin call? =
 
 Since 1.0.0, every request goes to OpenAI's public Responses API at `https://api.openai.com/v1/responses`, authorized with your ChatGPT plan through Sign in with ChatGPT. The models offered are the ones `https://api.openai.com/v1/models` lists for your account.
@@ -119,7 +123,7 @@ This plugin connects to services operated by OpenAI, L.L.C. so the WordPress AI 
 * **`GET https://auth.openai.com/.well-known/jwks.json`** is called from your server to fetch OpenAI's public keys and verify the ID token at sign-in. Nothing about your site or account is sent. The keys are cached for 24 hours.
 * **`POST https://auth.openai.com/api/accounts/oauth/revoke`** is called when the administrator clicks **Disconnect** or **Use a different ChatGPT account**, and once when the plugin is deleted while still connected (sends the client id and the refresh token). On deletion the call is best effort: if it fails, the plugin's data is removed anyway.
 * **`GET https://api.openai.com/v1/models`** is called with the access token to list the models your plan offers, usually at most once an hour (the list is cached on your site and fetched again after a sign-in, a disconnect or Clear cached model list) and from the diagnostics probe. No prompt or user content is sent.
-* **`POST https://api.openai.com/v1/responses`** is called whenever a plugin or theme on your site uses the AI Client with a ChatGPT model. The request carries the access token and what the calling code supplies: the prompt and conversation, system instructions, tool definitions, JSON schema, and any attached images or files.
+* **`POST https://api.openai.com/v1/responses`** is called whenever a plugin or theme on your site uses the AI Client with a ChatGPT model. The request carries the access token and what the calling code supplies: the prompt and conversation, system instructions, tool definitions, JSON schema, and any attached images or files, plus the reasoning effort chosen under Model settings when the calling code sets none.
 
 These services are provided by OpenAI. By connecting an account and using this provider you agree to OpenAI's terms:
 
@@ -137,6 +141,7 @@ These services are provided by OpenAI. By connecting an account and using this p
 = 1.1.0 =
 
 * Choose a default model and reasoning effort under Settings > ChatGPT > Model settings. A lower effort makes short tasks such as translation faster.
+* Settings > ChatGPT names the plugins that the AI plugin's Connector Approval experiment is blocking from ChatGPT, with a link to approve them.
 * Clear cached model list now also clears the model list WordPress 7 keeps in the object cache.
 
 = 1.0.1 =
@@ -176,6 +181,9 @@ These services are provided by OpenAI. By connecting an account and using this p
 * Default-model selection under Settings > ChatGPT.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Adds a default model and reasoning effort setting. Set the effort to Low to make short tasks such as translation faster.
 
 = 1.0.1 =
 Fixes a fatal error on WordPress 7 when updating from 0.1.x. Update now.

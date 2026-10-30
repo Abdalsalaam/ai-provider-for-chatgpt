@@ -5,7 +5,7 @@
  * Description: Registers OpenAI as a WordPress AI provider using Sign in with ChatGPT. Usage is billed to the connected ChatGPT Plus, Pro or Go plan.
  * Requires at least: 6.9
  * Requires PHP: 7.4
- * Version: 1.0.1
+ * Version: 1.1.0
  * Author: Abdalsalaam Halawa
  * Author URI: https://halawa.io
  * License: GPL-2.0-or-later
@@ -45,7 +45,7 @@ require_once __DIR__ . '/vendor/autoload.php';
  *
  * @since 1.0.0
  */
-const VERSION = '1.0.1';
+const VERSION = '1.1.0';
 
 /**
  * Sign in with ChatGPT endpoints and identifiers (OpenAI open-source app flow).

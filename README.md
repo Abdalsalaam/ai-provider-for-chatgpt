@@ -102,6 +102,8 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 | `/diagnostics` | GET | Provider and connection diagnostics |
 | `/diagnostics/remote-models` | GET | Probe `GET /v1/models` |
 | `/cache` | DELETE | Clear the cached model list |
+| `/settings` | GET | Default model, reasoning effort, the listed models with their efforts, and plugins the AI plugin blocks from this connector |
+| `/settings` | POST | Save `default_model` and `reasoning_effort` (empty string for the default) |
 
 ## Security model
 
@@ -110,7 +112,7 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 - **Sign-in.** State, nonce and the PKCE verifier stay on the server, one pending sign-in per administrator, valid for 10 minutes and usable once. The pasted address must match the expected redirect exactly. The ID token is verified against OpenAI's published keys (signature, issuer, audience, expiry, nonce) before anything is saved.
 - **Refresh.** Tokens are refreshed when the access token is near expiry and once a week by cron, under a database lock so two requests never use the same refresh token. If OpenAI ends the session, the connection is marked as needing a new sign-in and no further requests are sent.
 - **Disconnect.** The refresh token is revoked at OpenAI, then the tokens are deleted. The registration (issued client id, site id, and the account's id, email and name) is kept, so signing in again reuses it for the same account. **Use a different ChatGPT account** also deletes the site's copy of the registration (the issued client id and the account's id, email and name); the app stays listed under ChatGPT **Settings > Security and login > Sign in with ChatGPT**, where you can disconnect it.
-- **Requests.** Every `/responses` request is sent with `store: false`.
+- **Requests.** Every `/responses` request is sent with `store: false`. The reasoning effort from **Model settings** is added only when the caller sets none, and dropped for a day for a model whose request rejects it.
 
 ## Troubleshooting
 
@@ -124,6 +126,8 @@ Namespace `ai-provider-for-chatgpt/v1`. Every route requires the `manage_options
 - **"ChatGPT session ended".** OpenAI ended the session (for example after you disconnected the app under ChatGPT **Settings > Security and login > Sign in with ChatGPT**). Sign in again under **Settings > ChatGPT**.
 - **Usage limit reached.** Review your usage and per-app limits at [chatgpt.com/settings/usage](https://chatgpt.com/settings/usage).
 - **The model picker shows only the fallback models.** The SDK caches the model list for 24 hours, so after a failed `/v1/models` request the fallback list can stay until the cache is cleared. Clear it under **Settings > ChatGPT**, **Developer tools** menu, **Clear cached model list**.
+- **Responses are slow.** Every model a ChatGPT plan offers is a reasoning model and runs at medium effort by default. Set **Reasoning effort** to **Low** under **Settings > ChatGPT > Model settings**. It applies when the calling code sets no effort; reasoning cannot be turned off.
+- **AI features fail with a generic error such as "An error occurred while resizing content."** The AI plugin's Connector Approval experiment is blocking the plugin making the request (the AI plugin itself included). Approve it under **Tools > Connector Approvals**. **Settings > ChatGPT** lists the plugins that are waiting.
 - **Admin notice "the admin UI bundle is missing".** Run `npm install && npm run build` in the plugin directory.
 
 ## Development
@@ -145,7 +149,7 @@ Source layout:
 
 ```
 src/
-  Admin/           settings page, assets, upgrade routine and notice
+  Admin/           settings page, assets, upgrade routine and notice, Connector Approval hint
   Authentication/  encrypted token store, request authentication
   Cache/           PSR-16 cache on transients for the SDK model list
   Metadata/        /v1/models directory
@@ -153,6 +157,7 @@ src/
   OAuth/           PKCE, callback URL, JWKS verifier, token endpoint, sign-in flow, refresher
   Provider/        the AI Client provider
   Rest/            REST controllers for the React admin UI
+  Settings/        default model and reasoning effort
 client/            React admin UI (built into build/)
 tests/phpunit/     PHPUnit tests, HTTP mock and fixtures
 ```

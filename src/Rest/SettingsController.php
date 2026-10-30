@@ -16,6 +16,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
 use WordPress\AiClient\AiClient;
+use Halawa\ChatGptAiProvider\Admin\ConnectorApproval;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 use Halawa\ChatGptAiProvider\Settings\ModelSettings;
 
@@ -127,7 +128,7 @@ class SettingsController extends WP_REST_Controller {
 	 *
 	 * @since 1.1.0
 	 *
-	 * @return array{default_model: string, reasoning_effort: string, models: list<array{id: string, name: string, efforts: list<string>|null, default_effort: string|null}>}
+	 * @return array{default_model: string, reasoning_effort: string, models: list<array{id: string, name: string, efforts: list<string>|null, default_effort: string|null}>, approval: array{callers: list<string>, url: string}|null}
 	 */
 	private function payload(): array {
 		// Listing first stores the efforts of a fresh model list.
@@ -146,6 +147,7 @@ class SettingsController extends WP_REST_Controller {
 			'default_model'    => ModelSettings::default_model(),
 			'reasoning_effort' => ModelSettings::reasoning_effort(),
 			'models'           => $models,
+			'approval'         => ConnectorApproval::pending(),
 		);
 	}
 

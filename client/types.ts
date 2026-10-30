@@ -89,6 +89,8 @@ export type ModelSettings = {
 	default_model: string;
 	reasoning_effort: string;
 	models: SettingsModel[];
+	// Plugins the AI plugin's Connector Approval experiment is blocking.
+	approval: { callers: string[]; url: string } | null;
 };
 
 export type CacheClearResult = {

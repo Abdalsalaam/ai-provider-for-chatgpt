@@ -143,6 +143,26 @@ export function ModelSettingsCard( { statusKey }: Props ) {
 
 	return (
 		<Stack direction="column" gap="md">
+			{ data.approval && (
+				<Notice.Root intent="warning">
+					<Notice.Description>
+						{ sprintf(
+							/* translators: %s: comma-separated plugin names, such as AI. */
+							__(
+								'The AI plugin is blocking ChatGPT requests from: %s. Approve them under Tools > Connector Approvals, or their AI features fail with a generic error.',
+								'ai-provider-for-chatgpt'
+							),
+							data.approval.callers.join( ', ' )
+						) }{ ' ' }
+						<a href={ data.approval.url }>
+							{ __(
+								'Review requests',
+								'ai-provider-for-chatgpt'
+							) }
+						</a>
+					</Notice.Description>
+				</Notice.Root>
+			) }
 			<p>
 				{ __(
 					'These apply when the plugin sending the prompt does not choose a model or a reasoning effort itself.',
