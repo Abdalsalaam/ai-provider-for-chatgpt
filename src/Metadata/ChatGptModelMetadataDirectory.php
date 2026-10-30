@@ -23,6 +23,7 @@ use WordPress\AiClient\Providers\OpenAiCompatibleImplementation\AbstractOpenAiCo
 use Halawa\ChatGptAiProvider\Authentication\ChatGptAccountAuthentication;
 use Halawa\ChatGptAiProvider\Authentication\TokenStore;
 use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
+use Halawa\ChatGptAiProvider\Settings\ModelSettings;
 
 /**
  * Model metadata directory backed by GET /v1/models.
@@ -102,6 +103,17 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	}
 
 	/**
+	 * Lists the models with the site's default model first.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @return array<string, ModelMetadata> Models keyed by id.
+	 */
+	protected function sendListModelsRequest(): array {
+		return ModelSettings::prefer_default( $this->list_models() );
+	}
+
+	/**
 	 * Lists the account's models, or the bundled list when the request fails.
 	 *
 	 * Authentication runs first and is not caught, so a site that is not
@@ -114,7 +126,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 *
 	 * @return array<string, ModelMetadata> Models keyed by id.
 	 */
-	protected function sendListModelsRequest(): array {
+	private function list_models(): array {
 		$store  = new TokenStore();
 		$cached = self::cached_entries();
 		if ( null !== $store->get() && $store->needs_signin() ) {
@@ -133,6 +145,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 			$listed = self::listed_entries( $response->getData() );
 			if ( array() !== $listed ) {
 				set_transient( self::CACHE_KEY, $listed, HOUR_IN_SECONDS );
+				ModelSettings::record_efforts( $listed );
 			}
 			$models = array_map( array( self::class, 'to_metadata' ), $listed );
 		} catch ( Throwable $e ) {
@@ -209,7 +222,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 * @since 1.0.0
 	 *
 	 * @param mixed $data The decoded body.
-	 * @return list<array{id: string, name: string, listed: bool, image: bool}>
+	 * @return list<array{id: string, name: string, listed: bool, image: bool, efforts: list<string>|null, default_effort: string|null}>
 	 */
 	private static function listed_entries( $data ): array {
 		return array_values(
@@ -228,7 +241,7 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 	 * @since 1.0.0
 	 *
 	 * @param mixed $data The decoded body.
-	 * @return list<array{id: string, name: string, listed: bool, image: bool}>
+	 * @return list<array{id: string, name: string, listed: bool, image: bool, efforts: list<string>|null, default_effort: string|null}>
 	 */
 	public static function normalise_entries( $data ): array {
 		$models  = is_array( $data ) && isset( $data['models'] ) && is_array( $data['models'] ) ? $data['models'] : array();
@@ -239,15 +252,40 @@ class ChatGptModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 			}
 			$name       = $model['display_name'] ?? '';
 			$modalities = $model['input_modalities'] ?? array();
+			$default    = $model['default_reasoning_level'] ?? null;
 			$entries[]  = array(
-				'id'     => $model['slug'],
-				'name'   => is_string( $name ) && '' !== $name ? $name : $model['slug'],
+				'id'             => $model['slug'],
+				'name'           => is_string( $name ) && '' !== $name ? $name : $model['slug'],
 				// A model without a visibility field is listed.
-				'listed' => 'list' === ( $model['visibility'] ?? 'list' ),
-				'image'  => is_array( $modalities ) && in_array( 'image', $modalities, true ),
+				'listed'         => 'list' === ( $model['visibility'] ?? 'list' ),
+				'image'          => is_array( $modalities ) && in_array( 'image', $modalities, true ),
+				'efforts'        => self::efforts( $model['supported_reasoning_levels'] ?? null ),
+				'default_effort' => is_string( $default ) && '' !== ModelSettings::sanitize_effort( $default ) ? $default : null,
 			);
 		}
 		return $entries;
+	}
+
+	/**
+	 * Returns the effort names of supported_reasoning_levels, or null when it is absent.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param mixed $levels The supported_reasoning_levels value.
+	 * @return list<string>|null
+	 */
+	private static function efforts( $levels ): ?array {
+		if ( ! is_array( $levels ) ) {
+			return null;
+		}
+		$efforts = array();
+		foreach ( $levels as $level ) {
+			$effort = is_array( $level ) && is_string( $level['effort'] ?? null ) ? ModelSettings::sanitize_effort( $level['effort'] ) : '';
+			if ( '' !== $effort ) {
+				$efforts[] = $effort;
+			}
+		}
+		return $efforts;
 	}
 
 	/**

@@ -25,6 +25,7 @@ Connecting takes about a minute and the settings screen walks you through every 
 * Function calling and tool use
 * Structured output via JSON schema
 * Image input
+* A default model and reasoning effort for prompts that do not choose their own
 * A guided settings screen: step-by-step instructions, Paste from clipboard, and a button to reopen the ChatGPT sign-in page
 * Refresh, disconnect and switch to a different ChatGPT account from the settings screen, with connection diagnostics
 * Clear messages when your ChatGPT session ends or your plan's usage limit is reached, with a link to manage usage in ChatGPT
@@ -83,6 +84,16 @@ Usage and per-app limits are at [https://chatgpt.com/settings/usage](https://cha
 
 Version 1.0.0 connects with Sign in with ChatGPT and no longer uses the command line tool or `auth.json` files. Existing connections are removed on update; sign in again under **Settings > ChatGPT**. Free accounts are no longer eligible.
 
+= Responses are slow. How do I make them faster? =
+
+Every model your ChatGPT plan offers is a reasoning model, and by default it reasons at its own default effort (medium for the current models). On **Settings > ChatGPT**, under **Model settings**, set **Reasoning effort** to **Low (fastest)** for short tasks such as translation, and pick a **Default model**. The plugin applies these only when the plugin sending the prompt does not choose a model or effort itself. ChatGPT models cannot turn reasoning off; Low is the lowest effort they accept.
+
+A plugin that calls the AI Client can also choose per prompt: `using_provider( 'chatgpt' )` and `using_model_preference( 'model-id' )` pick the model, and a `ModelConfig` passed to `using_model_config()` with the custom option `reasoning` set to `array( 'effort' => 'low' )` sets the effort.
+
+= Which API does the plugin call? =
+
+Since 1.0.0, every request goes to OpenAI's public Responses API at `https://api.openai.com/v1/responses`, authorized with your ChatGPT plan through Sign in with ChatGPT. The models offered are the ones `https://api.openai.com/v1/models` lists for your account.
+
 = Does this plugin work without the WordPress AI Client? =
 
 No. The plugin registers ChatGPT with the AI Client provider registry, so the AI Client must be available, either bundled in WordPress 7.0+ or installed as a separate package on 6.9.
@@ -122,6 +133,11 @@ These services are provided by OpenAI. By connecting an account and using this p
 2. The ChatGPT settings screen: sign in with ChatGPT, paste the address you landed on, then check the connection and its models in diagnostics.
 
 == Changelog ==
+
+= 1.1.0 =
+
+* Choose a default model and reasoning effort under Settings > ChatGPT > Model settings. A lower effort makes short tasks such as translation faster.
+* Clear cached model list now also clears the model list WordPress 7 keeps in the object cache.
 
 = 1.0.1 =
 

@@ -31,6 +31,8 @@ use Halawa\ChatGptAiProvider\Provider\ChatGptProvider;
 use Halawa\ChatGptAiProvider\Rest\CacheController;
 use Halawa\ChatGptAiProvider\Rest\ConnectionController;
 use Halawa\ChatGptAiProvider\Rest\DiagnosticsController;
+use Halawa\ChatGptAiProvider\Rest\SettingsController;
+use Halawa\ChatGptAiProvider\Settings\ModelSettings;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	return;
@@ -216,9 +218,12 @@ function register_rest_controllers(): void {
 	( new ConnectionController( $store ) )->register_routes();
 	( new DiagnosticsController( $store ) )->register_routes();
 	( new CacheController() )->register_routes();
+	( new SettingsController() )->register_routes();
 }
 
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_controllers' );
+
+ModelSettings::register();
 
 add_action( TokenRefresher::CRON_HOOK, array( TokenRefresher::class, 'run_cron' ) );
 
